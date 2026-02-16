@@ -209,8 +209,10 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [urlReady, setUrlReady] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
   const initialUserFromQueryRef = useRef<string | null>(null);
   const initialThreadFromQueryRef = useRef<SelectedThread | null>(null);
 
@@ -344,7 +346,7 @@ export default function Home() {
           await markThreadAsRead(payload.conversationId, resolvedThread, userId);
         }
 
-        setMobileSidebarOpen(false);
+        if (window.innerWidth <= 920) setSidebarOpen(false);
       } catch (openError) {
         setError(toErrorMessage(openError));
       } finally {
@@ -602,6 +604,16 @@ export default function Home() {
   }, [activeUserId, initializeWorkspace, selectedThread]);
 
   useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
@@ -666,6 +678,7 @@ export default function Home() {
   }, [activeUserId, pathname, router, selectedThread, urlReady]);
 
   const renderThreadItem = (
+    key: string,
     label: string,
     preview: MessagePreview | null,
     unreadCount: number,
@@ -673,6 +686,7 @@ export default function Home() {
     onClick: () => void,
   ) => (
     <button
+      key={key}
       type="button"
       className={`thread-button ${selected ? "is-selected" : ""}`}
       onClick={onClick}
@@ -689,64 +703,80 @@ export default function Home() {
         Skip to Active Conversation
       </a>
       <h1 className="sr-only">Thin Slack Workspace</h1>
-      <div className={`workspace ${mobileSidebarOpen ? "sidebar-open" : ""}`}>
-        <aside className="pane people-pane">
-          <div className="pane-title-wrap">
-            <p className="pane-kicker">Thin Slack</p>
-            <h2 className="pane-title">People</h2>
-          </div>
-          <label className="field-label" htmlFor="active-user">
-            Active User
-          </label>
-          <select
-            id="active-user"
-            name="activeUser"
-            autoComplete="off"
-            className="user-select"
-            value={activeUserId}
-            onChange={(event) => {
-              setActiveUserId(event.target.value);
-              setMessages([]);
-              setNextCursor(null);
-              setSelectedThread(null);
-            }}
-          >
-            {(bootstrap?.users ?? []).map((user) => (
-              <option value={user.id} key={user.id}>
-                {user.displayName}
-              </option>
-            ))}
-          </select>
-
+      <div className={`workspace ${sidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
+        <section className="pane threads-pane" id="thread-sidebar">
           {activeUser ? (
-            <div className="active-user-card">
-              <span
-                className="avatar-dot"
-                style={{ backgroundColor: activeUser.avatarColor }}
-                aria-hidden="true"
-              />
-              <div>
-                <p className="active-user-name">{activeUser.displayName}</p>
-                <p className="active-user-id">{activeUser.id}</p>
-              </div>
+            <div className="user-switcher" ref={userDropdownRef}>
+              <button
+                type="button"
+                className="user-switcher-toggle"
+                onClick={() => setUserDropdownOpen((open) => !open)}
+                aria-expanded={userDropdownOpen}
+              >
+                <span
+                  className="avatar-dot"
+                  style={{ backgroundColor: activeUser.avatarColor }}
+                  aria-hidden="true"
+                />
+                <span className="user-switcher-name">{activeUser.displayName}</span>
+                <span className="user-switcher-chevron" aria-hidden="true">
+                  {userDropdownOpen ? "\u25B4" : "\u25BE"}
+                </span>
+              </button>
+              {userDropdownOpen ? (
+                <div className="user-switcher-menu">
+                  {(bootstrap?.users ?? []).map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className={`user-switcher-option ${user.id === activeUserId ? "is-active" : ""}`}
+                      onClick={() => {
+                        if (user.id !== activeUserId) {
+                          setActiveUserId(user.id);
+                          setMessages([]);
+                          setNextCursor(null);
+                          setSelectedThread(null);
+                        }
+                        setUserDropdownOpen(false);
+                      }}
+                    >
+                      <span
+                        className="avatar-dot"
+                        style={{ backgroundColor: user.avatarColor }}
+                        aria-hidden="true"
+                      />
+                      <span>{user.displayName}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
-        </aside>
 
-        <section className="pane threads-pane" id="thread-sidebar">
           <div className="threads-header">
             <div>
               <p className="pane-kicker">Browse</p>
               <h2 className="pane-title">Conversations</h2>
             </div>
-            <button
-              type="button"
-              className="refresh-button"
-              onClick={handleRefresh}
-              disabled={refreshing || loadingBootstrap}
-            >
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </button>
+            <div className="threads-header-actions">
+              <button
+                type="button"
+                className="refresh-button"
+                onClick={handleRefresh}
+                disabled={refreshing || loadingBootstrap}
+              >
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </button>
+              <button
+                type="button"
+                className="sidebar-toggle"
+                onClick={() => setSidebarOpen(false)}
+                aria-controls="thread-sidebar"
+                aria-label="Collapse Sidebar"
+              >
+                {"\u2039"}
+              </button>
+            </div>
           </div>
 
           {loadingBootstrap ? (
@@ -761,6 +791,7 @@ export default function Home() {
                 <p className="thread-group-title"># Channels</p>
                 {bootstrap.channels.map((channel) =>
                   renderThreadItem(
+                    channel.conversationId,
                     `#${channel.channel.name}`,
                     channel.lastMessage,
                     channel.unreadCount,
@@ -779,6 +810,7 @@ export default function Home() {
                 <p className="thread-group-title">Direct messages</p>
                 {bootstrap.dms.map((dm: DmItem) =>
                   renderThreadItem(
+                    dm.otherUser.id,
                     dm.otherUser.displayName,
                     dm.lastMessage,
                     dm.unreadCount,
@@ -797,19 +829,21 @@ export default function Home() {
           ) : null}
         </section>
 
+        {!sidebarOpen && (
+          <button
+            type="button"
+            className="sidebar-expand-tab"
+            onClick={() => setSidebarOpen(true)}
+            aria-controls="thread-sidebar"
+            aria-label="Expand Sidebar"
+          >
+            {"\u203A"}
+          </button>
+        )}
+
         <main className="pane chat-pane" id="chat-main" tabIndex={-1}>
           <header className="chat-header">
             <div className="chat-header-main">
-              <button
-                type="button"
-                className="mobile-toggle"
-                onClick={() => setMobileSidebarOpen((open) => !open)}
-                aria-controls="thread-sidebar"
-                aria-expanded={mobileSidebarOpen}
-                aria-label="Toggle Conversation Sidebar"
-              >
-                Menu
-              </button>
               <div>
                 <p className="pane-kicker">Active Thread</p>
                 <h2 className="chat-title">{threadTitle}</h2>

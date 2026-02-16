@@ -6,7 +6,8 @@ Goal: build a thin Slack clone with full frontend + backend + DB, supporting onl
 - public seeded channels,
 - 1:1 DMs (auto-created on first message),
 - send + history messaging,
-- manual refresh with unread badges.
+- manual refresh with unread badges,
+- a persistent context document for future chats.
 
 Success criteria:
 - Active user can be switched from a header dropdown.
@@ -15,12 +16,14 @@ Success criteria:
 - Unread badges are accurate.
 - Latest 50 messages load first, with load-older pagination.
 - UI works on desktop and mobile.
+- A `PROJECT_CONTEXT.md` file exists and is kept updated for future chat sessions.
 
 ## Scope
 In scope:
 - Single Next.js TypeScript app with API routes and SQLite.
 - Slack-like 3-pane UI.
 - Seeded channels; runtime DM creation.
+- Project context documentation in markdown for future sessions.
 
 Out of scope:
 - Real auth, private channels, channel creation, edit/delete, reactions, file uploads, threads, presence, websocket realtime.
@@ -101,6 +104,39 @@ State behavior:
 7. Add read-state and refresh badge logic.
 8. Add error handling + empty/loading states.
 9. Final polish and runbook (`README`).
+10. Create `PROJECT_CONTEXT.md` with architecture, setup commands, API map, schema summary, seeded test users/channels, and known constraints.
+11. Add a maintenance rule: update `PROJECT_CONTEXT.md` whenever APIs, schema, scripts, or key workflows change.
+
+## Context File Spec (`PROJECT_CONTEXT.md`)
+Purpose:
+- Give any new chat/session enough project context to contribute immediately.
+
+Required sections:
+1. Project snapshot:
+- What the app does, MVP scope, and current non-goals.
+2. Tech stack:
+- Framework, runtime, DB, ORM, testing tools, and key scripts.
+3. Runbook:
+- `npm install`, env setup, DB setup/seed, dev server, lint, tests, build.
+4. Architecture map:
+- Main folders and responsibilities (`src/app`, `src/app/api`, `src/server`, `prisma`).
+5. Data model summary:
+- `User`, `Channel`, `Conversation`, `Message`, `ReadState` and key constraints.
+6. API reference:
+- Endpoint list, required headers, request/response notes, and validation/error behavior.
+7. Seed and local test identities:
+- Hardcoded users/channels and intended usage for manual QA.
+8. Product behavior:
+- Manual refresh model, unread badge behavior, pagination, DM auto-create rule.
+9. Current status and open tasks:
+- What is implemented and what is intentionally deferred.
+10. Update protocol:
+- Checklist for keeping context accurate after each meaningful change.
+
+Quality bar:
+- Keep concise but complete.
+- Prefer exact file paths and script names.
+- Update in the same PR/commit as behavior changes.
 
 ## Tests and Scenarios
 Automated:
