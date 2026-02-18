@@ -1,143 +1,220 @@
-# Project Context: Thin Slack (Channels + DMs)
+# Project Context: Agent-First Work Productivity Platform
 
-## 1. Project Snapshot
-- Project type: local-only thin Slack clone.
-- Product goal: support public channels and 1:1 DMs with persistent history.
-- Implemented MVP scope:
-- No auth; active identity selected in UI.
-- Public seeded channels.
-- DMs auto-created on first open/send.
-- Send + history messages.
-- Manual refresh model with unread badges.
-- Latest-50 pagination with load older.
-- Non-goals for current version:
-- Private channels.
-- Channel creation UI/API.
-- Message edit/delete/reactions/files/threads/presence.
-- Websocket or polling realtime.
+## 1. Strategic Direction
+Project goal:
+- Build the “Cursor for work productivity” by redesigning Slack around AI-mediated collaboration.
 
-## 2. Tech Stack
-- Frontend/backend framework: Next.js 16 App Router (`/Users/moshesimon/GitHub/OpenWork/src/app`).
+Core product principle:
+- Users communicate intent to AI first.
+- AI routes and drafts outbound communication to the right DM/channel.
+- AI filters inbound communication into a personal relevance feed.
+
+Implication:
+- The thin Slack chat system remains the transport substrate.
+
+## 2. Current Product State (Implemented)
+Current implementation includes:
+- Public channels + 1:1 DMs with seeded users/channels.
+- Expanded demo seed conversations across channels and selected DM threads.
+- Manual chat transport APIs and read-state/unread badges.
+- Agent-first UI regions on `/Users/moshesimon/GitHub/OpenWork/src/app/page.tsx`:
+  - Agent Command Bar
+  - Personal Briefing Feed
+  - Outlook-style Calendar tab (month grid + day agenda)
+  - Delivery Trace Panel
+  - Manual thread fallback panel
+- Agent orchestration pipeline:
+  - command ingestion
+  - calendar event create/update/delete/query execution
+  - routing
+  - relevance scoring
+  - proactive briefing creation
+  - outbound execution + delivery logs
+
+## 3. Product State Next (Near-Term)
+Planned next steps:
+1. Approval/review workflow for outbound sends (current default is autonomous path with policy overrides).
+2. Better proactive follow-up actions (auto-reply/draft branching).
+3. More complete integration/E2E coverage for agent flows.
+
+## 4. Tech Stack
+- Framework: Next.js 16 App Router.
 - Language: TypeScript.
-- Database: SQLite (`DATABASE_URL="file:./prisma/dev.db"`).
-- ORM: Prisma 7 with Better SQLite adapter.
-- ORM adapter wiring: `/Users/moshesimon/GitHub/OpenWork/src/lib/prisma.ts`.
-- Tests: Vitest.
-- Lint: ESLint (Next config).
+- DB: SQLite (`DATABASE_URL="file:./prisma/dev.db"`).
+- ORM: Prisma 7 + `@prisma/adapter-better-sqlite3`.
+- Test runner: Vitest.
+- Lint: ESLint.
+- AI provider layer: `anthropic` | `openai` | `mock` (implemented via Vercel AI SDK).
+- Workflow runtime: Trigger.dev tasks (v3 SDK APIs).
+- Default provider selection: `AI_PROVIDER=anthropic`.
+- Default Anthropic model: `ANTHROPIC_MODEL=claude-haiku-4-5`.
 
-## 3. Runbook (Local Dev)
-- Install deps:
+Key config files:
+- `/Users/moshesimon/GitHub/OpenWork/package.json`
+- `/Users/moshesimon/GitHub/OpenWork/prisma.config.ts`
+- `/Users/moshesimon/GitHub/OpenWork/next.config.ts`
+- `/Users/moshesimon/GitHub/OpenWork/.env.example`
+
+## 5. Local Runbook
+Install:
 ```bash
 npm install
 ```
-- Configure env:
+
+Env:
 ```bash
 cp .env.example .env
 ```
-- Initialize schema + seed:
+
+Set key for Anthropic provider:
+```bash
+# .env
+ANTHROPIC_API_KEY="..."
+```
+Optional Trigger.dev env for task dispatch:
+```bash
+# .env
+TRIGGER_SECRET_KEY="..."
+TRIGGER_PROJECT_REF="..."
+```
+
+Database init + seed:
 ```bash
 npm run setup
 ```
-- Start app:
+
+Run app:
 ```bash
 npm run dev
 ```
-- Quality checks:
+
+Validate:
 ```bash
 npm run lint
 npm test
 npm run build
 ```
 
-Important script behavior:
-- `npm run db:push` deletes local DB artifacts and recreates schema from Prisma diff script.
-- `npm run setup` is destructive for local data (recreates DB and reseeds).
+Important note:
+- `npm run setup` performs an in-place schema sync (`prisma db push`) and reseeds baseline data.
+- For a full local reset, use `npm run db:rebuild` followed by `npm run prisma:seed`.
 
-## 4. Architecture Map
-- App shell/UI:
+## 6. Architecture Map
+Frontend:
 - `/Users/moshesimon/GitHub/OpenWork/src/app/page.tsx`
-- API routes:
+- `/Users/moshesimon/GitHub/OpenWork/src/app/globals.css`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/layout.tsx`
+
+Chat transport routes:
 - `/Users/moshesimon/GitHub/OpenWork/src/app/api/bootstrap/route.ts`
 - `/Users/moshesimon/GitHub/OpenWork/src/app/api/conversations/[conversationId]/messages/route.ts`
 - `/Users/moshesimon/GitHub/OpenWork/src/app/api/conversations/[conversationId]/read/route.ts`
 - `/Users/moshesimon/GitHub/OpenWork/src/app/api/dms/[otherUserId]/messages/route.ts`
-- Service/business logic:
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/calendar/events/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/calendar/events/[eventId]/route.ts`
+
+Agent routes:
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/agent/commands/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/agent/tasks/[taskId]/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/agent/profile/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/agent/policies/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/briefings/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/briefings/[id]/ack/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/briefings/[id]/dismiss/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/briefings/[id]/act/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/channels/route.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/app/api/conversations/dm/route.ts`
+
+Core business logic:
 - `/Users/moshesimon/GitHub/OpenWork/src/server/chat-service.ts`
-- Seed and fixtures:
+- `/Users/moshesimon/GitHub/OpenWork/src/server/calendar-service.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/server/agent-service.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/orchestrator.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/relevance.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/routing.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/policy-resolver.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/executor.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/logging.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/provider/anthropic.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/provider/openai.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/agent/provider/mock.ts`
+
+Seed data:
 - `/Users/moshesimon/GitHub/OpenWork/src/server/seed-data.ts`
 - `/Users/moshesimon/GitHub/OpenWork/prisma/seed.ts`
-- Shared API helpers:
+
+Shared libs/types:
+- `/Users/moshesimon/GitHub/OpenWork/src/lib/prisma.ts`
 - `/Users/moshesimon/GitHub/OpenWork/src/lib/request.ts`
 - `/Users/moshesimon/GitHub/OpenWork/src/lib/api-error.ts`
-- Prisma config and schema:
-- `/Users/moshesimon/GitHub/OpenWork/prisma.config.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/types/chat.ts`
+- `/Users/moshesimon/GitHub/OpenWork/src/types/agent.ts`
+
+## 7. Data Model (Current)
+Schema source:
 - `/Users/moshesimon/GitHub/OpenWork/prisma/schema.prisma`
 
-## 5. Data Model Summary
-Schema file: `/Users/moshesimon/GitHub/OpenWork/prisma/schema.prisma`.
-
+Core chat tables:
 - `User`
-- `id`, `displayName`, `avatarColor`, `createdAt`
 - `Channel`
-- `id`, `slug` (unique), `name`, `createdAt`
-- `Conversation`
-- `id`, `type` (`CHANNEL|DM`), `channelId?`, `dmUserAId?`, `dmUserBId?`, `createdAt`
+- `Conversation` (`CHANNEL|DM`)
 - `Message`
-- `id`, `conversationId`, `senderId`, `body`, `createdAt`
 - `ReadState`
-- Composite PK: `conversationId + userId`, plus `lastReadAt`
 
-Key data rules:
-- Channel conversations are seeded.
-- DMs are not seeded; created on demand.
-- DM pair canonicalization is done in service logic via sorted user IDs.
-- Message max length: 2000 characters.
+Agent tables:
+- `AgentProfile`
+- `UserRelevanceProfile`
+- `AgentPolicyRule`
+- `AgentTask`
+- `AgentAction`
+- `OutboundDelivery`
+- `BriefingItem`
+- `AgentEventLog`
 
-## 6. API Reference
-Header requirement for all endpoints:
-- `x-user-id: <seeded-user-id>`
+Workspace planning tables:
+- `WorkspaceTask`
+- `CalendarEvent`
 
-Endpoints:
-1. `GET /api/bootstrap`
-- Returns active user, all users, channel list, DM list, unread counts, and last-message previews.
+Current important rules:
+- DMs are created on demand (canonical user pair).
+- Message body max length is 2000.
+- Pagination defaults/caps at 50.
+- Proactive agent pass uses a 2s budget and writes timeout/error state.
 
-2. `GET /api/conversations/:conversationId/messages?limit=50&cursor=<messageId>`
-- Returns `{ conversationId, messages[], nextCursor }`.
+## 8. APIs (Current)
+All endpoints require:
+- `x-user-id` header
 
-3. `POST /api/conversations/:conversationId/messages`
-- JSON body: `{ "body": "..." }`
-- Returns created message.
+Transport endpoints:
+- `GET /api/bootstrap`
+- `GET /api/conversations/:conversationId/messages?cursor=&limit=`
+- `POST /api/conversations/:conversationId/messages`
+- `POST /api/conversations/:conversationId/read`
+- `GET /api/dms/:otherUserId/messages?cursor=&limit=`
+- `POST /api/dms/:otherUserId/messages`
+- `GET /api/calendar/events?start=&end=&search=&limit=`
+- `POST /api/calendar/events`
+- `PATCH /api/calendar/events/:eventId`
+- `DELETE /api/calendar/events/:eventId`
 
-4. `POST /api/conversations/:conversationId/read`
-- Marks conversation read for active user.
+Agent endpoints:
+- `POST /api/agent/commands`
+- `GET /api/agent/tasks/:taskId`
+- `GET /api/agent/profile`
+- `PUT /api/agent/profile`
+- `GET /api/agent/policies`
+- `PUT /api/agent/policies`
+- `GET /api/briefings`
+- `POST /api/briefings/:id/ack`
+- `POST /api/briefings/:id/dismiss`
+- `POST /api/briefings/:id/act`
+- `POST /api/channels`
+- `POST /api/conversations/dm`
 
-5. `GET /api/dms/:otherUserId/messages?limit=50&cursor=<messageId>`
-- Finds or creates DM conversation and returns paged messages.
+Error contract:
+- `{ "errorCode": string, "message": string }`
 
-6. `POST /api/dms/:otherUserId/messages`
-- JSON body: `{ "body": "..." }`
-- Finds or creates DM conversation and creates message.
-
-Validation/error behavior:
-- Shared error shape: `{ "errorCode": "...", "message": "..." }`
-- Common statuses: `400`, `404`, `413`, `500`
-- Important error codes:
-- `MISSING_USER_HEADER`
-- `INVALID_JSON`
-- `USER_NOT_FOUND`
-- `CONVERSATION_NOT_FOUND`
-- `INVALID_LIMIT`
-- `INVALID_CURSOR`
-- `INVALID_BODY`
-- `EMPTY_BODY`
-- `BODY_TOO_LARGE`
-- `INVALID_DM_TARGET`
-- `DM_TARGET_NOT_FOUND`
-- `INTERNAL_ERROR`
-
-## 7. Seed and Local Test Identities
-Seed source: `/Users/moshesimon/GitHub/OpenWork/src/server/seed-data.ts`.
-
+## 9. Seeded Local Identities
 Users:
 - `u_alex` (Alex Park)
 - `u_brooke` (Brooke Lane)
@@ -150,49 +227,45 @@ Channels:
 - `#build`
 - `#design`
 
-Seed behavior:
-- Creates channel conversations with fixed IDs.
-- Seeds starter messages in channels.
-- Initializes `ReadState` for all users on all seeded channels.
-- Does not pre-create DMs.
+Pre-seeded DM threads:
+- `u_alex` <-> `u_brooke`
+- `u_carmen` <-> `u_erin`
+- `u_brooke` <-> `u_diego`
 
-## 8. Product Behavior (Current)
-- Active user can be switched via UI dropdown.
-- Thread selection and active user are persisted in localStorage.
-- URL is synchronized for shareable state:
-- `?user=<userId>&thread=<channel|dm>&id=<threadId>`
-- Selecting DM triggers auto-create if no conversation exists yet.
-- Opening a thread marks it read.
-- Sending message is optimistic in UI and reconciled with API response.
-- Cross-user updates are visible only after pressing Refresh.
-- Load older requests next page with cursor.
+## 10. Agent-First MVP v2 Status
+Implemented baseline:
+- Agent command ingestion and task/action/event persistence.
+- Agent calendar intent handling (create/update/delete/query) with context retrieval.
+- Provider abstraction with fallback behavior and Vercel AI SDK structured output + tools.
+- Rule + model blended relevance scoring.
+- Briefing feed APIs and status actions.
+- Channel/DM creation primitives.
+- Delivery trace retrieval via task API.
+- Trigger.dev task dispatch for command/proactive/bootstrap flows.
 
-## 9. Current Status and Open Tasks
-Implemented:
-- Full frontend, backend, DB schema, seed flow, and API routes for channel/DM messaging.
-- Manual refresh + unread counts + read-state updates.
-- Pagination and message validation.
-- Unit + integration tests for core service behavior.
+Still limited in v2:
+- No dedicated outbound draft-approval loop API yet.
+- E2E coverage for full agent workflows is still light.
 
-Testing coverage currently present:
-- Unit tests for helper logic.
-- Integration tests for bootstrap, unread/read behavior, DM auto-create, and pagination.
+## 11. Guardrails and Operating Defaults
+- Default autonomy seed is `AUTO`; policy rules can constrain behavior.
+- Low-confidence handling favors notify/suggest over autonomous send.
+- Manual transport endpoints remain available.
+- Provider failures fall back to deterministic/mock behavior and are logged.
 
-Deferred/open work:
-- E2E browser tests.
-- Auth and authorization.
-- Private channels/channel management.
-- Realtime push (websockets/SSE).
-- Rich messaging features (edit/delete/reactions/files/threads).
+## 12. Known Gaps
+- Approval-gated send UX/API is not implemented yet.
+- Multi-workspace, permissions, and enterprise controls are out of scope.
+- Observability is persisted in DB logs but no dashboard surface exists yet.
 
-## 10. Update Protocol (Keep This File Accurate)
-When behavior changes, update this file in the same commit/PR.
+## 13. Update Protocol
+Whenever project behavior changes, update this file in the same commit.
 
 Checklist:
-1. If scripts changed in `package.json`, update Runbook and script notes.
-2. If schema changed in `prisma/schema.prisma`, update Data Model Summary and rules.
-3. If routes or payloads changed in `src/app/api` or `src/types/chat.ts`, update API Reference.
-4. If seed users/channels changed in `src/server/seed-data.ts`, update Seed section.
-5. If UX behavior changed in `src/app/page.tsx`, update Product Behavior.
-6. If test coverage changed, update Current Status and coverage notes.
-7. Re-run `npm run lint && npm test && npm run build` and note any new constraints.
+1. If product direction changes, update Strategic Direction + Product State.
+2. If scripts/config/env change, update Tech Stack + Runbook.
+3. If APIs change, update API sections.
+4. If schema changes, update Data Model.
+5. If seed users/channels change, update Seeded Identities.
+6. If major UX flows change, update Product State sections.
+7. Re-run `npm run lint && npm test && npm run build` after substantive code changes.

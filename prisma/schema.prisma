@@ -11,15 +11,99 @@ enum ConversationType {
   DM
 }
 
+enum AutonomyLevel {
+  OFF
+  REVIEW
+  AUTO
+}
+
+enum SenderMode {
+  USER_AI_TAG
+  AGENT_ACCOUNT
+}
+
+enum AgentTaskSource {
+  USER_COMMAND
+  INBOUND_CHANNEL_MESSAGE
+  INBOUND_DM_MESSAGE
+  BOOTSTRAP_REFRESH
+  BRIEFING_ACTION
+}
+
+enum AgentTaskStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED_TIMEOUT
+  FAILED_ERROR
+}
+
+enum AgentActionType {
+  SEND_MESSAGE
+  CREATE_CHANNEL
+  CREATE_DM
+  INFORM_USER
+  DRAFT_SUGGESTION
+  LOG_ONLY
+}
+
+enum AgentActionStatus {
+  PLANNED
+  SKIPPED
+  EXECUTED
+  FAILED
+}
+
+enum BriefingStatus {
+  UNREAD
+  ACKED
+  DISMISSED
+  ACTED
+}
+
+enum BriefingImportance {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskItemStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
 model User {
-  id              String         @id
-  displayName     String
-  avatarColor     String
-  createdAt       DateTime       @default(now())
-  sentMessages    Message[]      @relation("MessageSender")
-  readStates      ReadState[]
-  dmConversationsA Conversation[] @relation("DmUserA")
-  dmConversationsB Conversation[] @relation("DmUserB")
+  id                 String                @id
+  displayName        String
+  avatarColor        String
+  createdAt          DateTime              @default(now())
+  sentMessages       Message[]             @relation("MessageSender")
+  readStates         ReadState[]
+  dmConversationsA   Conversation[]        @relation("DmUserA")
+  dmConversationsB   Conversation[]        @relation("DmUserB")
+  agentProfile       AgentProfile?
+  relevanceProfile   UserRelevanceProfile?
+  policyRules        AgentPolicyRule[]
+  agentTasks         AgentTask[]
+  briefingItems      BriefingItem[]
+  outboundDeliveries OutboundDelivery[]    @relation("OutboundSender")
+  targetedActions    AgentAction[]         @relation("AgentActionTargetUser")
+  chatMessages       AgentChatMessage[]
+  assignedTasks       WorkspaceTask[]      @relation("TaskAssignee")
+  createdTasks        WorkspaceTask[]      @relation("TaskCreator")
+  ownedCalendarEvents CalendarEvent[]      @relation("CalendarEventOwner")
+  createdCalendarEvents CalendarEvent[]    @relation("CalendarEventCreator")
+  calendarEventAttendances CalendarEventAttendee[] @relation("CalendarEventAttendeeUser")
 
   @@index([displayName])
 }
@@ -33,17 +117,20 @@ model Channel {
 }
 
 model Conversation {
-  id        String           @id @default(cuid())
-  type      ConversationType
-  channelId String?
-  dmUserAId String?
-  dmUserBId String?
-  createdAt DateTime         @default(now())
-  channel   Channel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  dmUserA   User?            @relation("DmUserA", fields: [dmUserAId], references: [id], onDelete: Cascade)
-  dmUserB   User?            @relation("DmUserB", fields: [dmUserBId], references: [id], onDelete: Cascade)
-  messages  Message[]
-  readStates ReadState[]
+  id              String            @id @default(cuid())
+  type            ConversationType
+  channelId       String?
+  dmUserAId       String?
+  dmUserBId       String?
+  createdAt       DateTime          @default(now())
+  channel         Channel?          @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  dmUserA         User?             @relation("DmUserA", fields: [dmUserAId], references: [id], onDelete: Cascade)
+  dmUserB         User?             @relation("DmUserB", fields: [dmUserBId], references: [id], onDelete: Cascade)
+  messages        Message[]
+  readStates      ReadState[]
+  targetActions   AgentAction[]     @relation("AgentActionConversation")
+  sourceBriefings BriefingItem[]    @relation("BriefingSourceConversation")
+  deliveries      OutboundDelivery[]
 
   @@index([type])
   @@index([dmUserAId])
@@ -52,13 +139,14 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(cuid())
-  conversationId String
-  senderId       String
-  body           String
-  createdAt      DateTime     @default(now())
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  id                String             @id @default(cuid())
+  conversationId    String
+  senderId          String
+  body              String
+  createdAt         DateTime           @default(now())
+  conversation      Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender            User               @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  outboundDeliveries OutboundDelivery[] @relation("OutboundMessage")
 
   @@index([conversationId, createdAt])
   @@index([senderId])
@@ -73,4 +161,211 @@ model ReadState {
 
   @@id([conversationId, userId])
   @@index([userId])
+}
+
+model AgentProfile {
+  id                   String        @id @default(cuid())
+  userId               String        @unique
+  defaultAutonomyLevel AutonomyLevel @default(AUTO)
+  senderMode           SenderMode    @default(USER_AI_TAG)
+  settingsJson         Json?
+  lastAnalysisAt       DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserRelevanceProfile {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  priorityPeopleJson   Json?
+  priorityChannelsJson Json?
+  priorityTopicsJson   Json?
+  urgencyKeywordsJson  Json?
+  mutedTopicsJson      Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AgentPolicyRule {
+  id            String        @id @default(cuid())
+  userId        String
+  scopeType     String
+  scopeKey      String
+  autonomyLevel AutonomyLevel @default(AUTO)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scopeType, scopeKey])
+}
+
+model AgentTask {
+  id           String          @id @default(cuid())
+  userId       String
+  source       AgentTaskSource
+  triggerRef   String?
+  inputText    String
+  status       AgentTaskStatus @default(PENDING)
+  confidence   Float?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorCode    String?
+  errorMessage String?
+  createdAt    DateTime        @default(now())
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actions      AgentAction[]
+  deliveries   OutboundDelivery[]
+  briefings    BriefingItem[]
+  eventLogs    AgentEventLog[]
+  chatMessages AgentChatMessage[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model AgentAction {
+  id                   String            @id @default(cuid())
+  taskId               String
+  type                 AgentActionType
+  status               AgentActionStatus @default(PLANNED)
+  targetConversationId String?
+  targetUserId         String?
+  targetChannelSlug    String?
+  payloadJson          Json?
+  reasoning            String?
+  confidence           Float?
+  executedAt           DateTime?
+  createdAt            DateTime          @default(now())
+  task                 AgentTask         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  targetConversation   Conversation?     @relation("AgentActionConversation", fields: [targetConversationId], references: [id], onDelete: SetNull)
+  targetUser           User?             @relation("AgentActionTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  deliveries           OutboundDelivery[]
+  eventLogs            AgentEventLog[]
+
+  @@index([taskId, status])
+  @@index([targetConversationId])
+}
+
+model OutboundDelivery {
+  id             String       @id @default(cuid())
+  taskId         String
+  actionId       String
+  conversationId String
+  messageId      String
+  senderUserId   String
+  aiAttribution  String
+  createdAt      DateTime     @default(now())
+  task           AgentTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  action         AgentAction  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message        Message      @relation("OutboundMessage", fields: [messageId], references: [id], onDelete: Cascade)
+  sender         User         @relation("OutboundSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([actionId])
+  @@index([conversationId])
+  @@index([senderUserId])
+}
+
+model BriefingItem {
+  id                    String            @id @default(cuid())
+  userId                String
+  taskId                String?
+  importance            BriefingImportance @default(MEDIUM)
+  title                 String
+  summary               String
+  recommendedActionJson Json?
+  sourceConversationId  String?
+  sourceMessageIdsJson  Json?
+  status                BriefingStatus    @default(UNREAD)
+  createdAt             DateTime          @default(now())
+  readAt                DateTime?
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task                  AgentTask?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  sourceConversation    Conversation?     @relation("BriefingSourceConversation", fields: [sourceConversationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, createdAt])
+}
+
+model AgentEventLog {
+  id        String      @id @default(cuid())
+  taskId    String
+  actionId  String?
+  eventType String
+  message   String
+  metaJson  Json?
+  createdAt DateTime    @default(now())
+  task      AgentTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  action    AgentAction? @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+}
+
+model AgentChatMessage {
+  id        String     @id @default(cuid())
+  userId    String
+  role      String
+  body      String
+  taskId    String?
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task      AgentTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model WorkspaceTask {
+  id          String         @id @default(cuid())
+  title       String
+  description String         @default("")
+  urgency     TaskUrgency    @default(MEDIUM)
+  status      TaskItemStatus @default(OPEN)
+  sortRank    Float          @default(0)
+  deadline    DateTime?
+  assigneeId  String?
+  createdById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  assignee    User?          @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy   User           @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([status, sortRank])
+  @@index([urgency])
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  ownerId     String
+  createdById String
+  title       String
+  description String   @default("")
+  location    String   @default("")
+  startAt     DateTime
+  endAt       DateTime
+  allDay      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User     @relation("CalendarEventOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("CalendarEventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  attendees   CalendarEventAttendee[]
+
+  @@index([ownerId, startAt])
+  @@index([ownerId, endAt])
+  @@index([createdById])
+}
+
+model CalendarEventAttendee {
+  eventId   String
+  userId    String
+  createdAt DateTime @default(now())
+  event     CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User          @relation("CalendarEventAttendeeUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId])
+  @@index([userId, eventId])
 }

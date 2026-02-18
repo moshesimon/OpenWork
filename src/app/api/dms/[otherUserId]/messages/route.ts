@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AgentTaskSource } from "@prisma/client";
 import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { parseJsonBody, requireUserIdHeader } from "@/lib/request";
 import { createDmMessage, getDmMessagesPage } from "@/server/chat-service";
+import { publishRealtimeEvent } from "@/server/realtime-events";
+import { runProactiveAnalysisJob } from "@/trigger/client";
 
 type Params = {
   otherUserId: string;
@@ -37,6 +40,34 @@ export async function POST(
     const userId = requireUserIdHeader(request);
     const body = await parseJsonBody<{ body?: unknown }>(request);
     const response = await createDmMessage(prisma, userId, otherUserId, body.body);
+
+    publishRealtimeEvent({
+      type: "workspace-update",
+      reason: "dm-message-created",
+      conversationId: response.message.conversationId,
+      userIds: [userId, otherUserId],
+    });
+
+    try {
+      await runProactiveAnalysisJob({
+        userId: otherUserId,
+        source: AgentTaskSource.INBOUND_DM_MESSAGE,
+        triggerRef: response.message.id,
+        event: {
+          sourceConversationId: response.message.conversationId,
+          sourceMessageId: response.message.id,
+          sourceSenderId: response.message.sender.id,
+          messageBody: response.message.body,
+          isDm: true,
+        },
+        contextHints: {
+          userIds: [userId, otherUserId],
+        },
+      });
+    } catch (analysisError) {
+      console.warn("DM proactive analysis failed:", analysisError);
+    }
+
     return NextResponse.json(response);
   } catch (error) {
     return errorResponse(error);
