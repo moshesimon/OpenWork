@@ -74,23 +74,27 @@ function toPublicUser(user: {
   };
 }
 
-function toMessageView(message: {
-  id: string;
-  body: string;
-  conversationId: string;
-  createdAt: Date;
-  sender: {
+function toMessageView(
+  message: {
     id: string;
-    displayName: string;
-    avatarColor: string;
-  };
-}): MessageView {
+    body: string;
+    conversationId: string;
+    createdAt: Date;
+    sender: {
+      id: string;
+      displayName: string;
+      avatarColor: string;
+    };
+  },
+  isAgentMessage = false,
+): MessageView {
   return {
     id: message.id,
     body: message.body,
     conversationId: message.conversationId,
     createdAt: message.createdAt.toISOString(),
     sender: toPublicUser(message.sender),
+    isAgentMessage,
   };
 }
 
@@ -205,6 +209,10 @@ async function paginateMessages(
       sender: {
         select: USER_SELECT,
       },
+      outboundDeliveries: {
+        select: { id: true },
+        take: 1,
+      },
     },
     orderBy: [
       {
@@ -229,7 +237,7 @@ async function paginateMessages(
   const ascendingMessages = window
     .slice()
     .reverse()
-    .map((message) => toMessageView(message));
+    .map((message) => toMessageView(message, message.outboundDeliveries.length > 0));
 
   return {
     conversationId,
@@ -266,35 +274,64 @@ async function unreadCountMap(
     return new Map();
   }
 
-  const readStates = await db.readState.findMany({
-    where: {
-      userId,
-      conversationId: {
-        in: conversationIds,
-      },
-    },
-    select: {
-      conversationId: true,
-      lastReadAt: true,
-    },
-  });
-
-  const readMap = new Map(readStates.map((state) => [state.conversationId, state.lastReadAt]));
-
-  const counts = await Promise.all(
-    conversationIds.map(async (conversationId) => {
-      const unread = await unreadCountForConversation(
-        db,
-        conversationId,
+  const [readStates, messageCounts] = await Promise.all([
+    db.readState.findMany({
+      where: {
         userId,
-        readMap.get(conversationId),
-      );
-
-      return [conversationId, unread] as const;
+        conversationId: { in: conversationIds },
+      },
+      select: {
+        conversationId: true,
+        lastReadAt: true,
+      },
     }),
-  );
+    db.message.groupBy({
+      by: ["conversationId"],
+      where: {
+        conversationId: { in: conversationIds },
+        senderId: { not: userId },
+      },
+      _count: { id: true },
+    }),
+  ]);
 
-  return new Map(counts);
+  const readMap = new Map(readStates.map((s) => [s.conversationId, s.lastReadAt]));
+  const totalMap = new Map(messageCounts.map((r) => [r.conversationId, r._count.id]));
+
+  // For conversations with a lastReadAt, we need a per-conversation count of messages
+  // after that cutoff. Fetch them all in one query and count in JS.
+  const conversationsWithReadState = readStates.map((s) => s.conversationId);
+  const unreadMessages =
+    conversationsWithReadState.length > 0
+      ? await db.message.findMany({
+          where: {
+            conversationId: { in: conversationsWithReadState },
+            senderId: { not: userId },
+          },
+          select: {
+            conversationId: true,
+            createdAt: true,
+          },
+        })
+      : [];
+
+  const unreadAfterRead = new Map<string, number>();
+  for (const msg of unreadMessages) {
+    const lastReadAt = readMap.get(msg.conversationId);
+    if (lastReadAt && msg.createdAt <= lastReadAt) continue;
+    unreadAfterRead.set(msg.conversationId, (unreadAfterRead.get(msg.conversationId) ?? 0) + 1);
+  }
+
+  const result = new Map<string, number>();
+  for (const conversationId of conversationIds) {
+    if (readMap.has(conversationId)) {
+      result.set(conversationId, unreadAfterRead.get(conversationId) ?? 0);
+    } else {
+      result.set(conversationId, totalMap.get(conversationId) ?? 0);
+    }
+  }
+
+  return result;
 }
 
 async function requireOtherUser(db: DbClient, currentUserId: string, otherUserId: string) {

@@ -8,7 +8,7 @@ import {
   getConversationMessagesPage,
 } from "@/server/chat-service";
 import { publishRealtimeEvent } from "@/server/realtime-events";
-import { runProactiveAnalysisJob } from "@/trigger/client";
+import { runAgentTurnJob } from "@/trigger/client";
 
 type Params = {
   conversationId: string;
@@ -93,19 +93,24 @@ export async function POST(
     try {
       await Promise.all(
         targets.map((targetUserId) =>
-          runProactiveAnalysisJob({
+          runAgentTurnJob({
             userId: targetUserId,
-            source:
-              conversation?.type === "DM"
-                ? AgentTaskSource.INBOUND_DM_MESSAGE
-                : AgentTaskSource.INBOUND_CHANNEL_MESSAGE,
-            triggerRef: response.message.id,
-            event: {
-              sourceConversationId: response.message.conversationId,
-              sourceMessageId: response.message.id,
-              sourceSenderId: response.message.sender.id,
-              messageBody: response.message.body,
-              isDm: conversation?.type === "DM",
+            trigger: {
+              type: "SYSTEM_EVENT",
+              payload: {
+                source:
+                  conversation?.type === "DM"
+                    ? AgentTaskSource.INBOUND_DM_MESSAGE
+                    : AgentTaskSource.INBOUND_CHANNEL_MESSAGE,
+                triggerRef: response.message.id,
+                event: {
+                  sourceConversationId: response.message.conversationId,
+                  sourceMessageId: response.message.id,
+                  sourceSenderId: response.message.sender.id,
+                  messageBody: response.message.body,
+                  isDm: conversation?.type === "DM",
+                },
+              },
             },
           }),
         ),

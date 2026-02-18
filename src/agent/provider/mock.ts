@@ -520,6 +520,25 @@ async function runMockCommand(input: AgentTurnInput): Promise<string> {
 async function runMockProactive(input: AgentTurnInput): Promise<string> {
   const lower = input.message.toLowerCase();
   const important = keywordIncludes(lower, ["urgent", "asap", "blocker", "today", "@"]);
+  const contextOutput = await runTool(input, "read_context", {});
+  const event =
+    contextOutput && typeof contextOutput.event === "object" && !Array.isArray(contextOutput.event)
+      ? (contextOutput.event as Record<string, unknown>)
+      : null;
+  const sourceSenderId =
+    event && typeof event.sourceSenderId === "string" ? event.sourceSenderId : null;
+
+  if (
+    keywordIncludes(lower, ["fyi", "for your notes", "chat note", "note to self", "note to me", "heads up"])
+  ) {
+    const output = await runTool(input, "write_ai_chat_message", {
+      body: `FYI: ${input.message}`,
+    });
+
+    if (output) {
+      return readMessage(output, "Added assistant chat note.");
+    }
+  }
 
   if (important) {
     const output = await runTool(input, "create_briefing", {
@@ -536,6 +555,19 @@ async function runMockProactive(input: AgentTurnInput): Promise<string> {
     }
   }
 
+  if (sourceSenderId && keywordIncludes(lower, ["reply", "respond"])) {
+    const output = await runTool(input, "send_message", {
+      body: "Thanks for the update. I saw this and will follow up shortly.",
+      targetUserId: sourceSenderId,
+      targetChannelSlug: null,
+      topic: null,
+    });
+
+    if (output) {
+      return readMessage(output, "Sent proactive reply.");
+    }
+  }
+
   const logOnly = await runTool(input, "log_only", { reason: "Low relevance signal." });
   if (logOnly) {
     return readMessage(logOnly, "Logged without action.");
@@ -548,12 +580,12 @@ export const mockProvider: AgentProvider = {
   name: "mock",
 
   async runTurn(input) {
-    if (pickTool(input, "create_task") || pickTool(input, "send_message")) {
-      return { text: await runMockCommand(input) };
+    if (pickTool(input, "read_context") || pickTool(input, "create_briefing")) {
+      return { text: await runMockProactive(input) };
     }
 
-    if (pickTool(input, "create_briefing") || pickTool(input, "log_only")) {
-      return { text: await runMockProactive(input) };
+    if (pickTool(input, "create_task") || pickTool(input, "send_message")) {
+      return { text: await runMockCommand(input) };
     }
 
     return { text: "No action taken." };

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "@univerjs/preset-sheets-core/lib/index.css";
+@import "@univerjs/preset-docs-core/lib/index.css";
 
 :root {
   --bg-main: #f7efe0;
@@ -1437,14 +1439,14 @@ textarea {
   grid-template-columns:
     clamp(240px, 23vw, 315px)
     minmax(0, 1fr)
-    clamp(300px, 28vw, 420px);
+    clamp(260px, 23vw, 360px);
   grid-template-areas: "sidebar main ai";
   gap: 10px;
   transition: grid-template-columns 250ms ease, gap 250ms ease;
 }
 
 .ow-layout.ow-sidebar-collapsed {
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 28vw, 420px);
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 23vw, 360px);
   grid-template-areas: "main ai";
 }
 
@@ -1469,6 +1471,8 @@ textarea {
 
 .ow-sidebar {
   grid-area: sidebar;
+  position: relative;
+  z-index: 2200;
   border-radius: 16px;
   padding: 10px 10px 12px;
   border: 1px solid rgba(17, 26, 40, 0.58);
@@ -1555,7 +1559,7 @@ textarea {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 10;
+  z-index: 2201;
   width: 24px;
   height: 48px;
   display: flex;
@@ -1578,6 +1582,8 @@ textarea {
 
 .ow-ai-panel {
   grid-area: ai;
+  position: relative;
+  z-index: 2200;
   border-radius: 16px;
   border: 1px solid rgba(17, 26, 40, 0.58);
   background:
@@ -1593,12 +1599,12 @@ textarea {
 }
 
 .ow-ai-panel-head {
-  padding: 10px 12px 9px;
+  padding: 8px 10px 7px;
   border-bottom: 1px solid rgba(220, 229, 247, 0.16);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .ow-ai-panel-kicker {
@@ -1610,11 +1616,39 @@ textarea {
 }
 
 .ow-ai-panel-title {
-  margin: 3px 0 0;
-  font-size: 1.12rem;
+  margin: 2px 0 0;
+  font-size: 1rem;
   line-height: 1.2;
   font-weight: 760;
   color: #f0f5ff;
+}
+
+.ow-ai-panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ow-ai-new-chat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(220, 229, 247, 0.7);
+  cursor: pointer;
+  transition: background 140ms, color 140ms;
+  flex-shrink: 0;
+}
+
+.ow-ai-new-chat:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #edf3ff;
 }
 
 .ow-ai-panel-collapse {
@@ -1644,7 +1678,7 @@ textarea {
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 10;
+  z-index: 2201;
   width: 24px;
   height: 48px;
   display: flex;
@@ -1666,7 +1700,7 @@ textarea {
 }
 
 .ow-ai-pane {
-  padding: 10px;
+  padding: 8px;
 }
 
 .ow-ai-panel .ow-ai-stream {
@@ -1796,6 +1830,164 @@ textarea {
 
 .ow-profile-option.is-active {
   background: rgba(142, 188, 255, 0.22);
+}
+
+.ow-sidebar-search {
+  padding: 0 2px;
+}
+
+.ow-sidebar-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(220, 229, 247, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+  transition: border-color 0.15s, background 0.15s;
+  padding: 0 8px;
+}
+
+.ow-sidebar-search-row:focus-within {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.ow-sidebar-search-icon {
+  flex-shrink: 0;
+  color: rgba(220, 229, 247, 0.45);
+  margin-right: 7px;
+  pointer-events: none;
+  transition: color 0.15s;
+}
+
+.ow-sidebar-search-row:focus-within .ow-sidebar-search-icon {
+  color: rgba(180, 210, 255, 0.75);
+}
+
+.ow-sidebar-search-row input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #edf3ff;
+  padding: 7px 0;
+  font-family: inherit;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.ow-sidebar-search-row input::placeholder {
+  color: rgba(220, 229, 247, 0.38);
+}
+
+.ow-sidebar-search-row input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+
+.ow-sidebar-search-clear {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: rgba(220, 229, 247, 0.5);
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0 0 6px;
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.ow-sidebar-search-clear:hover:not(:disabled) {
+  color: rgba(220, 229, 247, 0.9);
+}
+
+.ow-sidebar-search-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ow-sidebar-search-results-wrap {
+  gap: 8px;
+}
+
+.ow-sidebar-search-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ow-sidebar-search-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ow-sidebar-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ow-sidebar-search-result {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #eaf2ff;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.ow-sidebar-search-result:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(220, 229, 247, 0.24);
+}
+
+.ow-sidebar-search-title {
+  font-size: 0.83rem;
+  font-weight: 650;
+  color: #f2f6ff;
+  line-height: 1.2;
+}
+
+.ow-sidebar-search-subtitle,
+.ow-sidebar-search-snippet {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: rgba(220, 229, 247, 0.76);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ow-sidebar-search-snippet {
+  color: rgba(220, 229, 247, 0.62);
+}
+
+mark.ow-search-highlight {
+  background: rgba(255, 210, 80, 0.38);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  font-style: inherit;
+  font-weight: inherit;
+}
+
+.ow-search-empty-error {
+  color: #ffd4c8;
+}
+
+.ow-search-provider-meta {
+  margin-top: 2px;
+  color: rgba(220, 229, 247, 0.6);
 }
 
 .ow-refresh {
@@ -2310,6 +2502,8 @@ textarea {
 
 .ow-main {
   grid-area: main;
+  position: relative;
+  z-index: 1;
   min-width: 0;
   min-height: 0;
   border-radius: 18px;
@@ -2342,6 +2536,52 @@ textarea {
   text-wrap: balance;
 }
 
+.ow-global-search {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ow-global-search input {
+  flex: 1;
+  min-width: 220px;
+  border-radius: 10px;
+  border: 1px solid rgba(24, 32, 46, 0.16);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--ink-strong);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.86rem;
+}
+
+.ow-global-search button {
+  border-radius: 9px;
+  border: 1px solid rgba(12, 112, 105, 0.3);
+  background: rgba(12, 112, 105, 0.14);
+  color: var(--accent-strong);
+  font-family: inherit;
+  font-weight: 700;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+
+.ow-global-search button:hover:not(:disabled) {
+  background: rgba(12, 112, 105, 0.24);
+}
+
+.ow-global-search button.is-secondary {
+  border-color: rgba(24, 32, 46, 0.2);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink-strong);
+}
+
+.ow-global-search button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .ow-error {
   margin: 10px 16px 0;
   border-radius: 10px;
@@ -2367,6 +2607,100 @@ textarea {
   font-size: 0.88rem;
 }
 
+.ow-search-pane {
+  overflow: auto;
+}
+
+.ow-search-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ow-search-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.ow-search-group {
+  border-radius: 12px;
+  border: 1px solid rgba(24, 32, 46, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ow-search-group h3 {
+  margin: 0;
+  font-family: var(--font-display-stack);
+  font-size: 0.96rem;
+}
+
+.ow-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ow-search-result {
+  width: 100%;
+  border-radius: 9px;
+  border: 1px solid rgba(88, 117, 173, 0.2);
+  background: rgba(248, 251, 255, 0.86);
+  color: inherit;
+  font-family: inherit;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ow-search-result:hover {
+  background: rgba(226, 238, 255, 0.82);
+  border-color: rgba(88, 117, 173, 0.38);
+}
+
+.ow-search-result-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.ow-search-result-kind {
+  border-radius: 999px;
+  border: 1px solid rgba(58, 92, 153, 0.26);
+  background: rgba(230, 239, 255, 0.8);
+  color: #2d4f87;
+  padding: 1px 6px;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.ow-search-result-subtitle {
+  font-size: 0.8rem;
+  color: #4f5f7a;
+}
+
+.ow-search-result-snippet {
+  font-size: 0.78rem;
+  color: #52637f;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .ow-ai-stream,
 .ow-thread-stream {
   min-height: 0;
@@ -2375,13 +2709,13 @@ textarea {
 }
 
 .ow-ai-stream {
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.78);
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
 }
 
 .ow-thread-pane {
@@ -2402,8 +2736,8 @@ textarea {
 
 .ow-turn {
   max-width: 94%;
-  border-radius: 12px;
-  padding: 10px;
+  border-radius: 10px;
+  padding: 8px;
   border: 1px solid var(--line);
 }
 
@@ -2430,13 +2764,39 @@ textarea {
   border-color: rgba(12, 112, 105, 0.28);
 }
 
-.ow-turn-head {
+.ow-turn-mention-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
   margin-bottom: 8px;
+}
+
+.ow-turn-mention-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 6px;
+  border: 1px solid rgba(12, 112, 105, 0.3);
+  background: rgba(12, 112, 105, 0.1);
+  color: #0a5e58;
+  padding: 2px 7px 2px 5px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ow-turn-mention-pill .ow-mention-chip-sigil {
+  color: #0a7a72;
+  font-size: 0.72rem;
+}
+
+.ow-turn-head {
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 .ow-turn-head span {
@@ -2530,10 +2890,10 @@ textarea {
   border-radius: 12px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.82);
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .ow-command-form label,
@@ -2553,44 +2913,87 @@ textarea {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.92);
   color: var(--ink-strong);
-  padding: 9px 10px;
+  padding: 7px 9px;
   font-family: inherit;
+}
+
+.ow-command-input-box {
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.92);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ow-command-input-box textarea {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  resize: none;
+  outline: none;
+}
+
+.ow-command-input-box.has-chips textarea {
+  border-top: 1px solid var(--line) !important;
+  border-radius: 0 !important;
 }
 
 .ow-mention-chip-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
+  padding: 8px 8px 0;
 }
 
 .ow-mention-chip {
-  border-radius: 999px;
-  border: 1px solid rgba(58, 92, 153, 0.32);
-  background: rgba(233, 241, 255, 0.74);
+  border-radius: 6px;
+  border: 1px solid rgba(58, 92, 153, 0.28);
+  background: rgba(230, 239, 255, 0.7);
   color: #1d365f;
-  padding: 4px 8px;
+  padding: 3px 7px 3px 5px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-family: inherit;
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   cursor: pointer;
+  line-height: 1.4;
+  transition: background 0.1s, border-color 0.1s;
 }
 
 .ow-mention-chip:hover {
-  background: rgba(215, 229, 255, 0.9);
+  background: rgba(210, 226, 255, 0.9);
+  border-color: rgba(58, 92, 153, 0.45);
 }
 
-.ow-mention-chip-kind {
+.ow-mention-chip-sigil {
+  font-size: 0.72rem;
+  color: #3a5c99;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .ow-mention-chip-label {
-  max-width: 260px;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
+}
+
+.ow-mention-chip-remove {
+  font-size: 0.85rem;
+  color: #5a7ab5;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-left: 1px;
+  opacity: 0.7;
+}
+
+.ow-mention-chip:hover .ow-mention-chip-remove {
+  opacity: 1;
 }
 
 .ow-mention-picker {
@@ -2729,6 +3132,59 @@ textarea {
   font-size: 0.82rem;
   line-height: 1.45;
   resize: none;
+}
+
+.ow-univer-wrap {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ow-univer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ow-univer-surface {
+  position: relative;
+  min-height: 320px;
+  height: clamp(380px, 62vh, 920px);
+  flex: 1 1 auto;
+  transform: translateZ(0);
+  border-radius: 12px;
+  border: 1px solid rgba(88, 117, 173, 0.24);
+  background: rgba(255, 255, 255, 0.95);
+  overflow: hidden;
+}
+
+.ow-doc-preview-frame {
+  width: 100%;
+  min-height: 560px;
+  border: 1px solid rgba(88, 117, 173, 0.24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.ow-doc-download-link {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border-radius: 10px;
+  border: 1px solid rgba(88, 117, 173, 0.3);
+  background: rgba(255, 255, 255, 0.92);
+  color: #27487f;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
+.ow-doc-download-link:hover {
+  background: rgba(230, 240, 255, 0.96);
 }
 
 .ow-thread-form {
@@ -2924,6 +3380,9 @@ textarea {
 .ow-profile-trigger:focus-visible,
 .ow-profile-option:focus-visible,
 .ow-refresh:focus-visible,
+.ow-global-search input:focus-visible,
+.ow-global-search button:focus-visible,
+.ow-sidebar-search-result:focus-visible,
 .ow-sidebar-collapse:focus-visible,
 .ow-sidebar-expand:focus-visible,
 .ow-ai-panel-collapse:focus-visible,
@@ -2932,6 +3391,7 @@ textarea {
 .ow-nav-item:focus-visible,
 .ow-thread-item:focus-visible,
 .ow-thought summary:focus-visible,
+.ow-command-input-box:focus-within,
 .ow-command-form textarea:focus-visible,
 .ow-command-form button:focus-visible,
 .ow-mention-chip:focus-visible,
@@ -2953,9 +3413,18 @@ textarea {
 .ow-side-files-refresh:focus-visible,
 .ow-side-file-row:focus-visible,
 .ow-files-refresh:focus-visible,
-.ow-file-row:focus-visible {
+.ow-file-row:focus-visible,
+.ow-search-result:focus-visible {
   outline: 2px solid #9abfff;
   outline-offset: 2px;
+}
+
+.ow-command-input-box textarea:focus-visible,
+.ow-sidebar-search-row input:focus-visible,
+.ow-sidebar-search-row input:focus,
+.ow-sidebar-search-clear:focus-visible,
+.ow-sidebar-search-clear:focus {
+  outline: none;
 }
 
 .ow-tasks-pane {
@@ -3831,6 +4300,16 @@ textarea {
     align-items: flex-start;
   }
 
+  .ow-global-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ow-global-search input {
+    min-width: 0;
+    width: 100%;
+  }
+
   .ow-briefing-act {
     flex-direction: column;
   }
@@ -3841,4 +4320,393 @@ textarea {
     transform: none;
     height: 42px;
   }
+}
+
+/* ─── Email pane (Gmail-style) ─────────────────────────────────── */
+
+.ow-email-pane {
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--bg-panel-strong);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Left folder nav */
+.ow-email-nav {
+  width: 180px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.ow-email-compose-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #c62828;
+  color: #fff;
+  border: none;
+  border-radius: 24px;
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(198, 40, 40, 0.28);
+  transition: background-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.ow-email-compose-btn:hover {
+  background: #b71c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(198, 40, 40, 0.36);
+}
+
+.ow-email-folder-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 0 999px 999px 0;
+  margin-left: -10px;
+  padding: 8px 12px 8px 14px;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ink-strong);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 120ms ease;
+  width: calc(100% + 10px);
+}
+
+.ow-email-folder-btn:hover {
+  background: rgba(198, 40, 40, 0.09);
+}
+
+.ow-email-folder-btn.is-active {
+  background: rgba(198, 40, 40, 0.14);
+  color: #c62828;
+  font-weight: 700;
+}
+
+.ow-email-folder-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.ow-email-folder-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.ow-email-folder-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 1px 7px;
+  flex-shrink: 0;
+}
+
+.ow-email-folder-btn.is-active .ow-email-folder-count {
+  background: rgba(198, 40, 40, 0.18);
+  color: #c62828;
+}
+
+.ow-email-nav-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 8px 0;
+}
+
+/* Email list column */
+.ow-email-list-col {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ow-email-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.ow-email-search {
+  flex: 1;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--ink-strong);
+  outline: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.ow-email-search:focus {
+  border-color: #c62828;
+  background: #fff;
+}
+
+.ow-email-list-meta {
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ow-email-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.ow-email-row {
+  display: grid;
+  grid-template-columns: 20px 110px minmax(0, 1fr) 52px;
+  align-items: center;
+  column-gap: 6px;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 100ms ease;
+}
+
+.ow-email-row:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.ow-email-row.is-selected {
+  background: rgba(198, 40, 40, 0.09);
+  border-left: 3px solid #c62828;
+  padding-left: 9px;
+}
+
+.ow-email-row.is-unread {
+  background: #fff;
+}
+
+.ow-email-row.is-unread .ow-email-from,
+.ow-email-row.is-unread .ow-email-subject {
+  font-weight: 700;
+}
+
+.ow-email-star {
+  font-size: 0.9rem;
+  color: rgba(0, 0, 0, 0.22);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.ow-email-star.is-starred {
+  color: #f9ab00;
+}
+
+.ow-email-from {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ow-email-subject-preview {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.82rem;
+}
+
+.ow-email-subject {
+  color: var(--ink-strong);
+  font-weight: 500;
+}
+
+.ow-email-preview {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.ow-email-date {
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Email detail panel */
+.ow-email-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ow-email-empty-detail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.ow-email-empty-icon {
+  font-size: 2.5rem;
+  opacity: 0.3;
+  margin: 0;
+}
+
+.ow-email-detail-head {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.ow-email-detail-subject {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+  margin: 0 0 14px;
+  line-height: 1.3;
+}
+
+.ow-email-detail-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ow-email-detail-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c62828, #e53935);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ow-email-detail-from-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.ow-email-detail-from-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.ow-email-detail-from-addr {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.ow-email-detail-to {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+.ow-email-detail-date {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ow-email-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.ow-email-body-line {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: var(--ink-strong);
+  line-height: 1.6;
+}
+
+.ow-email-reply-bar {
+  padding: 12px 24px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ow-email-reply-btn {
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  color: var(--ink-strong);
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.ow-email-reply-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Sidebar email badge */
+.ow-email-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 176, 151, 0.42);
+  color: #fff6f2;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  min-width: 18px;
+  height: 16px;
 }

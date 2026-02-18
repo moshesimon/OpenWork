@@ -35,6 +35,16 @@ export type AgentContextPack = {
     endAt: string;
     allDay: boolean;
   }[];
+  recentBriefings: {
+    id: string;
+    title: string;
+    summary: string;
+    importance: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+    status: "UNREAD" | "ACKED" | "DISMISSED" | "ACTED";
+    sourceConversationId: string | null;
+    sourceMessageIds: string[];
+    createdAt: string;
+  }[];
   relevanceProfile: {
     priorityPeople: string[];
     priorityChannels: string[];

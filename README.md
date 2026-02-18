@@ -6,7 +6,7 @@ Local-only thin Slack clone built with:
 - API routes under `src/app/api`
 - Seeded users and channels, DM auto-create, automatic background sync
 - Agent orchestration layer with pluggable providers (`anthropic`, `openai`, `mock`) powered by Vercel AI SDK
-- Trigger.dev tasks for command/proactive/bootstrap orchestration
+- Trigger.dev tasks for unified-turn/bootstrap orchestration
 
 ## Features
 - No auth; active user chosen from UI dropdown (`x-user-id` sent to API).
@@ -17,6 +17,7 @@ Local-only thin Slack clone built with:
 - Workspace Calendar tab with Outlook-style month grid + day agenda.
 - AI command support for calendar event create/update/delete/query.
 - Responsive 3-pane layout with mobile drawer behavior.
+- Global search across channels, DMs, messages, tasks, calendar events, users, and company files.
 
 ## Setup
 1. Install dependencies:
@@ -37,6 +38,8 @@ Optional Trigger.dev setup (recommended for async orchestration):
 # in .env
 TRIGGER_SECRET_KEY="..."
 TRIGGER_PROJECT_REF="..."
+# Optional safety rollback for inbound DM/channel/bootstrap turns:
+# AGENT_SYSTEM_EVENT_TURNS_ENABLED="false"
 ```
 3. Initialize database and seed test users/channels:
 ```bash
@@ -76,8 +79,50 @@ npm run dev
 - `POST /api/calendar/events`
 - `PATCH /api/calendar/events/:eventId`
 - `DELETE /api/calendar/events/:eventId`
+- `GET /api/search/global?q=&limit=`
+- `POST /api/search/chatindex` (`{ query, userId?, limit? }`)
+- `POST /api/search/pageindex` (`{ query, limit? }`)
 
-All endpoints require `x-user-id` header.
+All app endpoints require `x-user-id` header except `/api/search/pageindex` and `/api/search/chatindex` adapter endpoints (which accept `userId` in the JSON body and also support header fallback).
+
+## Optional Python Search Adapters (FastAPI)
+- Install adapter dependencies:
+```bash
+npm run search:adapters:install
+```
+- Run ChatIndex adapter (`http://localhost:8101/search`):
+```bash
+npm run search:chatindex:api
+```
+- Run PageIndex adapter (`http://localhost:8102/search`):
+```bash
+npm run search:pageindex:api
+```
+- Run OfficeIndex adapter (`http://localhost:8103/search`):
+```bash
+npm run search:officeindex:api
+```
+- Trigger full OfficeIndex reindex:
+```bash
+npm run search:officeindex:reindex:full
+```
+- Trigger incremental OfficeIndex reindex:
+```bash
+npm run search:officeindex:reindex:incremental
+```
+- Or run all adapters:
+```bash
+npm run search:adapters:run
+```
+
+When running adapters, set in `.env`:
+- `CHATINDEX_SEARCH_URL="http://localhost:8101/search"`
+- `PAGEINDEX_SEARCH_URL="http://localhost:8102/search"`
+- `OFFICEINDEX_SEARCH_URL="http://localhost:8103/search"` (Phase 2 wiring in global search)
+
+Optional OfficeIndex controls in `.env`:
+- `OFFICEINDEX_REFRESH_INTERVAL_SECONDS="25"`
+- `OFFICEINDEX_BACKGROUND_SYNC_SECONDS="0"` (enable periodic incremental refresh when > 0)
 
 ## Validation Rules
 - Message body is required after trim.
@@ -98,3 +143,4 @@ npm run lint
 - DM conversation IDs are canonicalized by sorted user pair.
 - Read state stored per `conversationId + userId`.
 - No websocket transport: data is refreshed automatically via SSE push plus polling/focus sync fallback.
+- Unified agent runtime entrypoint is `runAgentTurn` for both user commands and system events.

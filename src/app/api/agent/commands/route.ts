@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { parseJsonBody, requireUserIdHeader } from "@/lib/request";
-import { runAgentCommandJob } from "@/trigger/client";
+import { runAgentTurnJob } from "@/trigger/client";
 import type {
   AgentCommandContextHints,
   AgentCommandRequest,
@@ -288,21 +288,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userMsg = await prisma.agentChatMessage.create({
-      data: { userId, role: "user", body: input },
-    });
-
     let reply: string;
     let taskId: string;
 
     try {
-      const result = await runAgentCommandJob({
+      const result = await runAgentTurnJob({
         userId,
-        input,
-        mode: body.mode,
+        trigger: {
+          type: "USER_MESSAGE",
+          payload: {
+            input,
+            mode: body.mode,
+            mentions,
+          },
+        },
         contextHints,
-        mentions,
       });
+
+      if (result.triggerType !== "USER_MESSAGE") {
+        throw new Error("Unexpected unified turn result type.");
+      }
+
       taskId = result.taskId;
       reply = result.reply;
     } catch (err) {
@@ -310,9 +316,14 @@ export async function POST(request: NextRequest) {
       reply = `Something went wrong: ${err instanceof Error ? err.message : "Unknown error"}`;
     }
 
-    const assistantMsg = await prisma.agentChatMessage.create({
-      data: { userId, role: "assistant", body: reply, taskId: taskId || undefined },
-    });
+    const [userMsg, assistantMsg] = await prisma.$transaction([
+      prisma.agentChatMessage.create({
+        data: { userId, role: "user", body: input },
+      }),
+      prisma.agentChatMessage.create({
+        data: { userId, role: "assistant", body: reply, taskId: taskId || undefined },
+      }),
+    ]);
 
     return NextResponse.json({
       taskId,

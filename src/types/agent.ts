@@ -230,6 +230,61 @@ export type CalendarEventsResponse = {
   items: CalendarEventView[];
 };
 
+export type GlobalSearchResultKind =
+  | "channel"
+  | "dm"
+  | "message"
+  | "file"
+  | "task"
+  | "event"
+  | "user";
+
+export type GlobalSearchHighlightRange = {
+  start: number;
+  end: number;
+};
+
+export type GlobalSearchHighlights = {
+  title?: GlobalSearchHighlightRange[];
+  subtitle?: GlobalSearchHighlightRange[];
+  snippet?: GlobalSearchHighlightRange[];
+};
+
+export type GlobalSearchResult = {
+  id: string;
+  kind: GlobalSearchResultKind;
+  source: "native" | "chatindex-service" | "pageindex-service" | "officeindex-service";
+  score: number;
+  title: string;
+  subtitle: string;
+  snippet: string | null;
+  createdAt: string | null;
+  conversationId: string | null;
+  threadKind: "channel" | "dm" | null;
+  channelSlug: string | null;
+  channelName: string | null;
+  otherUserId: string | null;
+  otherUserName: string | null;
+  messageId: string | null;
+  filePath: string | null;
+  taskId: string | null;
+  eventId: string | null;
+  eventStartAt: string | null;
+  userId: string | null;
+  highlights?: GlobalSearchHighlights;
+};
+
+export type GlobalSearchResponse = {
+  query: string;
+  total: number;
+  tookMs: number;
+  providers: {
+    chat: string;
+    files: string;
+  };
+  results: GlobalSearchResult[];
+};
+
 export type WorkspaceFileEntry = {
   name: string;
   path: string;
@@ -264,6 +319,7 @@ export type WorkspaceDocumentReadResponse = {
   path: string;
   name: string;
   extension: string;
+  contentType: string;
   editable: boolean;
   content: string | null;
   sizeBytes: number;

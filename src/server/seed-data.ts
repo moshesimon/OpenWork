@@ -603,6 +603,8 @@ export async function resetDatabase(db: DbClient): Promise<void> {
   await db.briefingItem.deleteMany();
   await db.outboundDelivery.deleteMany();
   await db.agentAction.deleteMany();
+  await db.agentProactiveOutputDedup.deleteMany();
+  await db.agentSystemTurnIdempotency.deleteMany();
   await db.agentTask.deleteMany();
   await db.agentPolicyRule.deleteMany();
   await db.userRelevanceProfile.deleteMany();

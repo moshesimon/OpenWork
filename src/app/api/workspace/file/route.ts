@@ -33,17 +33,23 @@ export async function GET(request: NextRequest) {
     const fileInfo = await readWorkspaceFileInfo(relativePath);
 
     if (!fileInfo.editable) {
+      const readOnlyMessage =
+        fileInfo.extension === ".pdf"
+          ? "PDF files are preview-only in this workspace."
+          : [".ppt", ".pptx", ".pps", ".ppsx"].includes(fileInfo.extension)
+            ? "PPT/PPTX files can be listed and opened, but direct editing in this build requires Univer slide exchange support."
+          : "This format requires a Univer adapter (or converter) before AI can edit it directly.";
       const response: WorkspaceDocumentReadResponse = {
         path: relativePath,
         name: fileInfo.name,
         extension: fileInfo.extension,
+        contentType: fileInfo.contentType,
         editable: false,
         content: null,
         sizeBytes: fileInfo.sizeBytes,
         updatedAt: asIso(fileInfo.updatedAt),
         version: fileInfo.version,
-        message:
-          "This format requires a Univer adapter (or converter) before AI can edit it directly.",
+        message: readOnlyMessage,
       };
       return NextResponse.json(response);
     }
@@ -61,6 +67,7 @@ export async function GET(request: NextRequest) {
       path: relativePath,
       name: fileInfo.name,
       extension: fileInfo.extension,
+      contentType: fileInfo.contentType,
       editable: true,
       content,
       sizeBytes: fileInfo.sizeBytes,

@@ -1,6 +1,6 @@
 import { task } from "@trigger.dev/sdk/v3";
-import type { ProactiveInput, RunCommandInput, RunCommandResult } from "@/agent/orchestrator";
-import { maybeRunBootstrapAnalysis, runAgentCommand, runProactiveAnalysis } from "@/agent/orchestrator";
+import type { AgentTurnRequest, AgentTurnResult } from "@/agent/orchestrator";
+import { maybeRunBootstrapAnalysis, runAgentTurn } from "@/agent/orchestrator";
 import { prisma } from "@/lib/prisma";
 
 type BootstrapPayload = {
@@ -8,18 +8,10 @@ type BootstrapPayload = {
   staleMs?: number;
 };
 
-export const runAgentCommandTask = task({
-  id: "agent-run-command",
-  run: async (payload: RunCommandInput): Promise<RunCommandResult> => {
-    return runAgentCommand(prisma, payload);
-  },
-});
-
-export const runProactiveAnalysisTask = task({
-  id: "agent-run-proactive-analysis",
-  run: async (payload: ProactiveInput): Promise<{ queued: true }> => {
-    await runProactiveAnalysis(prisma, payload);
-    return { queued: true };
+export const runAgentTurnTask = task({
+  id: "agent-run-turn",
+  run: async (payload: AgentTurnRequest): Promise<AgentTurnResult> => {
+    return runAgentTurn(prisma, payload);
   },
 });
 

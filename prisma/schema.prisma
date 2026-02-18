@@ -225,6 +225,36 @@ model AgentTask {
   @@index([status])
 }
 
+model AgentSystemTurnIdempotency {
+  id         String          @id @default(cuid())
+  userId     String
+  source     AgentTaskSource
+  triggerRef String
+  taskId     String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([userId, triggerRef], name: "user_trigger")
+  @@index([taskId])
+  @@index([userId, createdAt])
+}
+
+model AgentProactiveOutputDedup {
+  id                   String   @id @default(cuid())
+  userId               String
+  sourceConversationId String
+  sourceEventId        String
+  actionKind           String
+  taskId               String?
+  outputId             String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([userId, sourceConversationId, sourceEventId, actionKind], name: "user_source_event_action")
+  @@index([taskId])
+  @@index([userId, createdAt])
+}
+
 model AgentAction {
   id                   String            @id @default(cuid())
   taskId               String

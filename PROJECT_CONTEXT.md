@@ -46,6 +46,7 @@ Planned next steps:
 - Lint: ESLint.
 - AI provider layer: `anthropic` | `openai` | `mock` (implemented via Vercel AI SDK).
 - Workflow runtime: Trigger.dev tasks (v3 SDK APIs).
+- Optional external search adapters: Python FastAPI services under `agent_runtime/search_adapters`.
 - Default provider selection: `AI_PROVIDER=anthropic`.
 - Default Anthropic model: `ANTHROPIC_MODEL=claude-haiku-4-5`.
 
@@ -150,6 +151,10 @@ Shared libs/types:
 - `/Users/moshesimon/GitHub/OpenWork/src/types/chat.ts`
 - `/Users/moshesimon/GitHub/OpenWork/src/types/agent.ts`
 
+Optional adapter services:
+- `/Users/moshesimon/GitHub/OpenWork/agent_runtime/search_adapters/chatindex_api.py`
+- `/Users/moshesimon/GitHub/OpenWork/agent_runtime/search_adapters/pageindex_api.py`
+
 ## 7. Data Model (Current)
 Schema source:
 - `/Users/moshesimon/GitHub/OpenWork/prisma/schema.prisma`
@@ -182,7 +187,7 @@ Current important rules:
 - Proactive agent pass uses a 2s budget and writes timeout/error state.
 
 ## 8. APIs (Current)
-All endpoints require:
+Most endpoints require:
 - `x-user-id` header
 
 Transport endpoints:
@@ -196,6 +201,13 @@ Transport endpoints:
 - `POST /api/calendar/events`
 - `PATCH /api/calendar/events/:eventId`
 - `DELETE /api/calendar/events/:eventId`
+- `GET /api/search/global?q=&limit=`
+- `POST /api/search/chatindex` (`{ query, userId?, limit? }`)
+- `POST /api/search/pageindex` (`{ query, limit? }`)
+
+Search adapter endpoint auth notes:
+- `POST /api/search/chatindex`: accepts `userId` in JSON body (also supports header fallback)
+- `POST /api/search/pageindex`: no `x-user-id` requirement
 
 Agent endpoints:
 - `POST /api/agent/commands`
@@ -241,7 +253,7 @@ Implemented baseline:
 - Briefing feed APIs and status actions.
 - Channel/DM creation primitives.
 - Delivery trace retrieval via task API.
-- Trigger.dev task dispatch for command/proactive/bootstrap flows.
+- Trigger.dev task dispatch for unified-turn/bootstrap flows.
 
 Still limited in v2:
 - No dedicated outbound draft-approval loop API yet.
@@ -252,6 +264,7 @@ Still limited in v2:
 - Low-confidence handling favors notify/suggest over autonomous send.
 - Manual transport endpoints remain available.
 - Provider failures fall back to deterministic/mock behavior and are logged.
+- Rollback guardrail: set `AGENT_SYSTEM_EVENT_TURNS_ENABLED=false` to pause inbound DM/channel/bootstrap-triggered turns while keeping user-command turns active.
 
 ## 12. Known Gaps
 - Approval-gated send UX/API is not implemented yet.

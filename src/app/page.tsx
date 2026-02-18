@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { WorkspaceUniverEditor } from "@/components/workspace-univer-editor";
 import type {
   AgentCommandContextHints,
   AgentCommandResponse,
@@ -20,6 +21,9 @@ import type {
   BriefingItemView,
   BriefingsResponse,
   ChatMessageView,
+  GlobalSearchHighlightRange,
+  GlobalSearchResponse,
+  GlobalSearchResult,
   TasksResponse,
   WorkspaceDocumentReadResponse,
   WorkspaceDocumentSaveResponse,
@@ -52,12 +56,13 @@ type Thread =
       label: string;
     };
 
-type WorkspaceView = "thread" | "tasks" | "calendar" | "docs";
+type WorkspaceView = "thread" | "tasks" | "calendar" | "docs" | "email";
 type SidebarSection = "channels" | "dms" | "files";
 type FileBadgeTone = "generic" | "pdf" | "word" | "excel" | "slides" | "text" | "image" | "archive";
+type WorkspaceDocumentMode = "text" | "univer" | "pdf" | "preview";
 
 type AiTimelineItem =
-  | ({ kind: "chat" } & ChatMessageView)
+  | ({ kind: "chat"; mentions?: AgentMention[] } & ChatMessageView)
   | {
       kind: "briefing";
       id: string;
@@ -136,6 +141,219 @@ const MENTION_KINDS: MentionKindDefinition[] = [
   { kind: "dm", label: "@dm", description: "Direct messages" },
   { kind: "channel", label: "@channel", description: "Channels" },
   { kind: "file", label: "@file", description: "Company files" },
+];
+
+type EmailFolder = "inbox" | "sent" | "drafts" | "spam";
+type FakeEmail = {
+  id: string;
+  from: string;
+  fromEmail: string;
+  to: string;
+  subject: string;
+  preview: string;
+  body: string;
+  date: string;
+  read: boolean;
+  starred: boolean;
+  folder: EmailFolder;
+};
+
+const FAKE_EMAILS: FakeEmail[] = [
+  {
+    id: "e1",
+    from: "Sarah Chen",
+    fromEmail: "sarah.chen@acme.co",
+    to: "me@acme.co",
+    subject: "Q3 Product Roadmap — final review",
+    preview: "Hi team, I've updated the roadmap doc with the feedback from last week's all-hands.",
+    body: "Hi team,\n\nI've updated the roadmap doc with the feedback from last week's all-hands. The key changes are:\n\n• Moved the analytics dashboard to Q4\n• Added two new API integrations in August\n• Pushed the mobile redesign to next quarter\n\nPlease review and leave comments before EOD Friday.\n\nThanks,\nSarah",
+    date: "2026-02-18T09:14:00Z",
+    read: false,
+    starred: true,
+    folder: "inbox",
+  },
+  {
+    id: "e2",
+    from: "James O'Brien",
+    fromEmail: "james@acme.co",
+    to: "me@acme.co",
+    subject: "Re: Design system token updates",
+    preview: "Looks great! One small thing — the spacing tokens don't match the Figma file exactly.",
+    body: "Looks great! One small thing — the spacing tokens don't match the Figma file exactly.\n\nSpecifically, space-4 should be 16px not 14px. Could you double-check with Maya?\n\nOtherwise this is solid work. Let's ship it.\n\n— James",
+    date: "2026-02-18T08:52:00Z",
+    read: false,
+    starred: false,
+    folder: "inbox",
+  },
+  {
+    id: "e3",
+    from: "GitHub",
+    fromEmail: "noreply@github.com",
+    to: "me@acme.co",
+    subject: "[openwork/app] PR #214 merged: Add agent streaming support",
+    preview: "Pull request #214 was merged by @moshesimon into main.",
+    body: "Pull request #214 was merged by @moshesimon into main.\n\nAdd agent streaming support\n\nThis PR adds real-time streaming to the AI agent responses using the Vercel AI SDK.\n\n• 23 files changed, +1,482 −340\n\nView the pull request on GitHub.",
+    date: "2026-02-17T22:31:00Z",
+    read: true,
+    starred: false,
+    folder: "inbox",
+  },
+  {
+    id: "e4",
+    from: "Lena Müller",
+    fromEmail: "lena.muller@acme.co",
+    to: "me@acme.co",
+    subject: "Meeting tomorrow: Sprint retrospective",
+    preview: "Just a reminder that we have the sprint retro tomorrow at 10am PST. Agenda attached.",
+    body: "Just a reminder that we have the sprint retro tomorrow at 10am PST.\n\nAgenda:\n1. What went well (10 min)\n2. What could be improved (15 min)\n3. Action items (10 min)\n\nZoom link: https://zoom.us/j/example\n\nSee you then!\nLena",
+    date: "2026-02-17T16:05:00Z",
+    read: false,
+    starred: true,
+    folder: "inbox",
+  },
+  {
+    id: "e5",
+    from: "Stripe",
+    fromEmail: "receipts@stripe.com",
+    to: "me@acme.co",
+    subject: "Your receipt from Stripe — $249.00",
+    preview: "You were charged $249.00 on February 17, 2026 for OpenWork Pro.",
+    body: "Receipt from Stripe\n\nDate: February 17, 2026\nDescription: OpenWork Pro — Monthly\nAmount: $249.00\n\nThank you for your business.",
+    date: "2026-02-17T13:44:00Z",
+    read: true,
+    starred: false,
+    folder: "inbox",
+  },
+  {
+    id: "e6",
+    from: "Tom Harris",
+    fromEmail: "tom.harris@acme.co",
+    to: "me@acme.co",
+    subject: "Weekly engineering digest",
+    preview: "Here's a summary of what the engineering team shipped this week.",
+    body: "Weekly Engineering Digest — Week of Feb 10\n\nShipped this week:\n• Agent orchestration v2\n• Calendar sync improvements\n• Global search (beta)\n• Bug fixes: 14 closed\n\nIn progress:\n• Email integration\n• Mobile app v1.2\n\nBlockers:\n• Waiting on design for onboarding flow\n\nHave a great weekend!\nTom",
+    date: "2026-02-14T17:30:00Z",
+    read: true,
+    starred: false,
+    folder: "inbox",
+  },
+  {
+    id: "e7",
+    from: "Figma",
+    fromEmail: "no-reply@figma.com",
+    to: "me@acme.co",
+    subject: "Maya shared 'OpenWork Design System v3' with you",
+    preview: "Maya Rivera invited you to view a file in Figma.",
+    body: "Maya Rivera invited you to view a file in Figma.\n\nFile: OpenWork Design System v3\n\nClick the button below to open the file in Figma.",
+    date: "2026-02-13T11:20:00Z",
+    read: true,
+    starred: false,
+    folder: "inbox",
+  },
+  {
+    id: "e8",
+    from: "HR Team",
+    fromEmail: "hr@acme.co",
+    to: "me@acme.co",
+    subject: "Action required: Complete your 2026 benefits enrollment",
+    preview: "Benefits enrollment closes on March 1st. Please complete your selections.",
+    body: "Hi,\n\nThis is a reminder to complete your 2026 benefits enrollment. The window closes on March 1st, 2026.\n\nTo enroll:\n1. Log into the HR portal\n2. Navigate to Benefits > 2026 Enrollment\n3. Make your selections and confirm\n\nIf you have questions, contact hr@acme.co.\n\nBest,\nHR Team",
+    date: "2026-02-12T09:00:00Z",
+    read: false,
+    starred: false,
+    folder: "inbox",
+  },
+  {
+    id: "e9",
+    from: "me",
+    fromEmail: "me@acme.co",
+    to: "sarah.chen@acme.co",
+    subject: "Re: Q3 Product Roadmap — final review",
+    preview: "Thanks Sarah, I'll leave my comments by end of day Thursday.",
+    body: "Thanks Sarah, I'll leave my comments by end of day Thursday.\n\nQuick note: I think we should reconsider the API integrations timeline — the third-party dependency might not be ready by August.\n\nI'll add a comment in the doc.\n\n— Me",
+    date: "2026-02-18T09:45:00Z",
+    read: true,
+    starred: false,
+    folder: "sent",
+  },
+  {
+    id: "e10",
+    from: "me",
+    fromEmail: "me@acme.co",
+    to: "engineering@acme.co",
+    subject: "RFC: Unified search architecture",
+    preview: "I've drafted an RFC for the new unified search system. Would love feedback.",
+    body: "Hi all,\n\nI've put together an RFC for the new unified search architecture. It covers:\n\n1. Indexing strategy (chat, files, calendar, email)\n2. Query language\n3. Vector similarity search for semantic queries\n4. Relevance scoring\n\nDraft is in Notion. Please leave comments by next Wednesday.\n\nThanks!",
+    date: "2026-02-15T14:20:00Z",
+    read: true,
+    starred: true,
+    folder: "sent",
+  },
+  {
+    id: "e11",
+    from: "me",
+    fromEmail: "me@acme.co",
+    to: "lena.muller@acme.co",
+    subject: "Quick question about sprint retro format",
+    preview: "Hey Lena, are we doing the usual Start/Stop/Continue format or something different?",
+    body: "Hey Lena,\n\nAre we doing the usual Start/Stop/Continue format for the retro, or are you trying something different this time?\n\nAlso — do you want me to facilitate the action items section?\n\nThanks!",
+    date: "2026-02-17T10:12:00Z",
+    read: true,
+    starred: false,
+    folder: "sent",
+  },
+  {
+    id: "e12",
+    from: "me",
+    fromEmail: "me@acme.co",
+    to: "investors@acme.co",
+    subject: "[DRAFT] February investor update",
+    preview: "MRR grew 18% MoM. DAU up 34%. Key hires: 2 engineers, 1 designer.",
+    body: "[DRAFT — DO NOT SEND]\n\nHi investors,\n\nHere's the February update:\n\n📈 Metrics:\n• MRR: $84K (+18% MoM)\n• DAU: 2,300 (+34% MoM)\n• Churn: 1.2%\n\n🏆 Highlights:\n• Launched AI agent v2\n• Added email integration (beta)\n• Key hires: 2 engineers, 1 designer\n\n🔭 Next month:\n• Mobile app launch\n• Enterprise tier\n\nBest,",
+    date: "2026-02-18T07:30:00Z",
+    read: true,
+    starred: true,
+    folder: "drafts",
+  },
+  {
+    id: "e13",
+    from: "me",
+    fromEmail: "me@acme.co",
+    to: "press@techcrunch.com",
+    subject: "[DRAFT] OpenWork funding announcement pitch",
+    preview: "We'd love to share our story with TechCrunch. OpenWork is an AI-first work platform…",
+    body: "[DRAFT]\n\nHi,\n\nI'm reaching out because we're announcing our Series A and would love TechCrunch's coverage.\n\nOpenWork is an AI-first work platform that helps teams move faster by putting AI at the center of every workflow — from messaging to tasks to files.\n\nWe've grown from 0 to 2,300 DAU in 6 months, all word-of-mouth. Would love to chat.\n\nBest,",
+    date: "2026-02-16T16:00:00Z",
+    read: true,
+    starred: false,
+    folder: "drafts",
+  },
+  {
+    id: "e14",
+    from: "LinkedIn",
+    fromEmail: "messages-noreply@linkedin.com",
+    to: "me@acme.co",
+    subject: "You have 5 new connection requests",
+    preview: "Alex Turner, Priya Nair, and 3 others want to connect with you on LinkedIn.",
+    body: "You have 5 new connection requests on LinkedIn.\n\nRespond to stay connected with your professional network.",
+    date: "2026-02-17T08:00:00Z",
+    read: true,
+    starred: false,
+    folder: "spam",
+  },
+  {
+    id: "e15",
+    from: "Sales Outreach",
+    fromEmail: "outreach@salestools.io",
+    to: "me@acme.co",
+    subject: "10x your pipeline with AI SDRs",
+    preview: "Hi there, I noticed you're building a productivity platform. Our AI SDR tool…",
+    body: "Hi there,\n\nI noticed you're building a productivity platform. Our AI SDR tool can help you 10x your outbound pipeline in 30 days.\n\nWould you be open to a quick 15-minute call?\n\nBest,\nSales Bot",
+    date: "2026-02-16T09:15:00Z",
+    read: false,
+    starred: false,
+    folder: "spam",
+  },
 ];
 
 const TASK_COLUMNS: Array<{
@@ -391,8 +609,66 @@ function mentionLabel(mention: AgentMention): string {
   return mention.path;
 }
 
+
 function mentionKindLabel(kind: AgentMentionKind): string {
   return MENTION_KINDS.find((entry) => entry.kind === kind)?.label ?? `@${kind}`;
+}
+
+function searchKindLabel(kind: GlobalSearchResult["kind"]): string {
+  if (kind === "message") {
+    return "Message";
+  }
+
+  if (kind === "file") {
+    return "File";
+  }
+
+  if (kind === "task") {
+    return "Task";
+  }
+
+  if (kind === "event") {
+    return "Event";
+  }
+
+  if (kind === "channel") {
+    return "Channel";
+  }
+
+  if (kind === "dm") {
+    return "DM";
+  }
+
+  return "User";
+}
+
+function renderHighlightedText(
+  text: string,
+  ranges: GlobalSearchHighlightRange[] | undefined,
+): ReactNode {
+  if (!ranges || ranges.length === 0) {
+    return text;
+  }
+
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  for (const range of ranges) {
+    if (range.start > cursor) {
+      nodes.push(text.slice(cursor, range.start));
+    }
+    if (range.end > range.start) {
+      nodes.push(
+        <mark key={range.start} className="ow-search-highlight">
+          {text.slice(range.start, range.end)}
+        </mark>,
+      );
+    }
+    cursor = range.end;
+  }
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+  return nodes;
 }
 
 function buildMentionContextHints(mentions: AgentMention[]): AgentCommandContextHints | undefined {
@@ -573,6 +849,46 @@ function fileBadgeFromName(name: string): { label: string; tone: FileBadgeTone }
   };
 }
 
+function normalizeDocumentExtension(extension: string): string {
+  const normalized = extension.trim().toLowerCase();
+  return normalized.startsWith(".") ? normalized : `.${normalized}`;
+}
+
+function resolveWorkspaceDocumentMode(document: WorkspaceDocumentReadResponse): WorkspaceDocumentMode {
+  if (document.editable) {
+    return "text";
+  }
+
+  const extension = normalizeDocumentExtension(document.extension);
+  if (extension === ".pdf") {
+    return "pdf";
+  }
+
+  if (
+    extension === ".xlsx" ||
+    extension === ".xls" ||
+    extension === ".xlsm" ||
+    extension === ".docx" ||
+    extension === ".doc" ||
+    extension === ".ppt" ||
+    extension === ".pptx" ||
+    extension === ".pps" ||
+    extension === ".ppsx"
+  ) {
+    return "univer";
+  }
+
+  return "preview";
+}
+
+function buildWorkspaceFileRawUrl(relativePath: string, userId: string): string {
+  const params = new URLSearchParams({
+    path: relativePath,
+    userId,
+  });
+  return `/api/workspace/file/raw?${params.toString()}`;
+}
+
 function DisclosureChevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
@@ -592,6 +908,7 @@ export default function Home() {
   const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
   const [briefings, setBriefings] = useState<BriefingItemView[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessageView[]>([]);
+  const [messageMentions, setMessageMentions] = useState<Map<string, AgentMention[]>>(new Map());
 
   const [commandInput, setCommandInput] = useState("");
   const [commandCursor, setCommandCursor] = useState(0);
@@ -599,12 +916,20 @@ export default function Home() {
   const [mentionNavIndex, setMentionNavIndex] = useState(0);
   const [commandRunning, setCommandRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [globalSearchInput, setGlobalSearchInput] = useState("");
+  const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const [globalSearchResults, setGlobalSearchResults] = useState<GlobalSearchResult[]>([]);
+  const [globalSearchProviders, setGlobalSearchProviders] = useState<{ chat: string; files: string }>({
+    chat: "native",
+    files: "native",
+  });
+  const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
+  const [globalSearchError, setGlobalSearchError] = useState<string | null>(null);
 
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
   const [manualMessages, setManualMessages] = useState<MessageView[]>([]);
   const [manualBody, setManualBody] = useState("");
   const [loadingManual, setLoadingManual] = useState(false);
-  const [sendingManual, setSendingManual] = useState(false);
 
   const [tasks, setTasks] = useState<WorkspaceTaskView[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventView[]>([]);
@@ -649,6 +974,9 @@ export default function Home() {
   const [expandedDirectories, setExpandedDirectories] = useState<Set<string>>(
     () => new Set([""]),
   );
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [emailFolder, setEmailFolder] = useState<EmailFolder>("inbox");
+  const [emailSearchInput, setEmailSearchInput] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiPanelOpen, setAiPanelOpen] = useState(true);
@@ -656,12 +984,20 @@ export default function Home() {
     () => new Set(["channels", "files"]),
   );
   const loadedDirectoriesRef = useRef<Set<string>>(new Set());
-  const refreshInFlightRef = useRef(false);
-  const pendingRefreshUserIdRef = useRef<string | null>(null);
+  const refreshEpochRef = useRef(0);
+  const selectedThreadRef = useRef<Thread | null>(null);
+  const activeViewRef = useRef<WorkspaceView>("thread");
+  const calendarMonthRef = useRef<Date>(new Date());
+
+  // Keep refs in sync with state so refreshAll doesn't need them as deps
+  selectedThreadRef.current = selectedThread;
+  activeViewRef.current = activeView;
+  calendarMonthRef.current = calendarMonth;
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const commandInputRef = useRef<HTMLTextAreaElement>(null);
   const workspaceDocumentContentRef = useRef("");
+  const globalSearchRequestRef = useRef(0);
 
   const activeUser = useMemo(() => {
     if (!bootstrap) {
@@ -700,6 +1036,106 @@ export default function Home() {
     );
     setChatMessages(payload.messages);
   }, []);
+
+  const clearChat = useCallback(async () => {
+    setChatMessages([]);
+    setMessageMentions(new Map());
+    setBriefings([]);
+    await apiRequest<{ ok: boolean }>("/api/agent/chat", activeUserId, { method: "DELETE" });
+  }, [activeUserId]);
+
+  const resetGlobalSearch = useCallback(() => {
+    globalSearchRequestRef.current += 1;
+    setGlobalSearchQuery("");
+    setGlobalSearchResults([]);
+    setGlobalSearchProviders({
+      chat: "native",
+      files: "native",
+    });
+    setGlobalSearchError(null);
+    setGlobalSearchLoading(false);
+  }, []);
+
+  const clearGlobalSearch = useCallback(() => {
+    setGlobalSearchInput("");
+    resetGlobalSearch();
+  }, [resetGlobalSearch]);
+
+  const submitGlobalSearch = useCallback(
+    async (query: string) => {
+      const normalizedQuery = query.trim();
+      if (!normalizedQuery) {
+        resetGlobalSearch();
+        return;
+      }
+
+      const requestId = ++globalSearchRequestRef.current;
+      setGlobalSearchLoading(true);
+      setGlobalSearchError(null);
+      try {
+        const params = new URLSearchParams({
+          q: normalizedQuery,
+          limit: "60",
+        });
+        const payload = await apiRequest<GlobalSearchResponse>(
+          `/api/search/global?${params.toString()}`,
+          activeUserId,
+        );
+
+        if (requestId !== globalSearchRequestRef.current) {
+          return;
+        }
+
+        setGlobalSearchQuery(payload.query);
+        setGlobalSearchResults(payload.results);
+        setGlobalSearchProviders(payload.providers);
+      } catch (searchError) {
+        if (requestId !== globalSearchRequestRef.current) {
+          return;
+        }
+
+        setGlobalSearchQuery(normalizedQuery);
+        setGlobalSearchResults([]);
+        setGlobalSearchProviders({
+          chat: "native",
+          files: "native",
+        });
+        setGlobalSearchError(toErrorMessage(searchError));
+      } finally {
+        if (requestId === globalSearchRequestRef.current) {
+          setGlobalSearchLoading(false);
+        }
+      }
+    },
+    [activeUserId, resetGlobalSearch],
+  );
+
+  const debouncedSidebarSearch = useCallback(
+    (query: string) => {
+      if (typeof window === "undefined") {
+        return () => undefined;
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        void submitGlobalSearch(query);
+      }, 120);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    },
+    [submitGlobalSearch],
+  );
+
+  useEffect(() => {
+    const query = globalSearchInput.trim();
+    if (!query) {
+      resetGlobalSearch();
+      return;
+    }
+
+    return debouncedSidebarSearch(query);
+  }, [debouncedSidebarSearch, globalSearchInput, resetGlobalSearch]);
 
   const loadTasks = useCallback(
     async (userId: string) => {
@@ -937,6 +1373,22 @@ export default function Home() {
     }
   }, [activeUserId, workspaceDocument, workspaceDocumentContent, workspaceDocumentSaving]);
 
+  const handleUniverDocumentSaved = useCallback((payload: WorkspaceDocumentSaveResponse) => {
+    setWorkspaceDocument((previous) => {
+      if (!previous) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        sizeBytes: payload.sizeBytes,
+        updatedAt: payload.updatedAt,
+        version: payload.version,
+      };
+    });
+    setWorkspaceAiStatus("Saved document.");
+  }, []);
+
   const applyAiWorkspaceEdits = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -1136,55 +1588,38 @@ export default function Home() {
 
   const refreshAll = useCallback(
     async (userId = activeUserId) => {
-      if (refreshInFlightRef.current) {
-        pendingRefreshUserIdRef.current = userId;
-        return;
-      }
+      const epoch = ++refreshEpochRef.current;
+      const stale = () => refreshEpochRef.current !== epoch;
 
-      let nextUserId: string | null = userId;
-      while (nextUserId) {
-        const refreshUserId = nextUserId;
-        refreshInFlightRef.current = true;
-        pendingRefreshUserIdRef.current = null;
+      setError(null);
+      try {
+        const loadedDirectories = Array.from(loadedDirectoriesRef.current);
+        const directoriesToRefresh = loadedDirectories.length > 0 ? loadedDirectories : [""];
 
-        setError(null);
-        try {
-          await Promise.all([
-            loadBootstrap(refreshUserId),
-            loadBriefings(refreshUserId),
-            loadChat(refreshUserId),
-            loadTasks(refreshUserId),
-            loadCalendar(refreshUserId, calendarMonth, { silent: true }),
-          ]);
+        await Promise.all([
+          loadBootstrap(userId),
+          loadBriefings(userId),
+          loadChat(userId),
+          loadTasks(userId),
+          loadCalendar(userId, calendarMonthRef.current, { silent: true }),
+          ...directoriesToRefresh.map((directory) =>
+            loadWorkspaceDirectory(directory, { force: true, userId }),
+          ),
+        ]);
 
-          if (
-            refreshUserId === activeUserId &&
-            activeView === "thread" &&
-            selectedThread
-          ) {
-            await loadThreadMessages(selectedThread, refreshUserId);
-          }
+        if (stale()) return;
 
-          const loadedDirectories = Array.from(loadedDirectoriesRef.current);
-          const directoriesToRefresh = loadedDirectories.length > 0 ? loadedDirectories : [""];
-          await Promise.all(
-            directoriesToRefresh.map((directory) =>
-              loadWorkspaceDirectory(directory, { force: true, userId: refreshUserId }),
-            ),
-          );
-        } catch (refreshError) {
-          setError(toErrorMessage(refreshError));
-        } finally {
-          refreshInFlightRef.current = false;
+        if (userId === activeUserId && activeViewRef.current === "thread" && selectedThreadRef.current) {
+          await loadThreadMessages(selectedThreadRef.current, userId);
         }
-
-        nextUserId = pendingRefreshUserIdRef.current;
+      } catch (refreshError) {
+        if (!stale()) {
+          setError(toErrorMessage(refreshError));
+        }
       }
     },
     [
       activeUserId,
-      activeView,
-      calendarMonth,
       loadBootstrap,
       loadBriefings,
       loadCalendar,
@@ -1192,7 +1627,6 @@ export default function Home() {
       loadTasks,
       loadThreadMessages,
       loadWorkspaceDirectory,
-      selectedThread,
     ],
   );
 
@@ -1214,6 +1648,70 @@ export default function Home() {
     [activeUserId, loadThreadMessages],
   );
 
+  const openGlobalSearchResult = useCallback(
+    async (result: GlobalSearchResult) => {
+      setGlobalSearchError(null);
+
+      if (result.kind === "file" && result.filePath) {
+        setWorkspaceFileSelection(result.filePath);
+        setWorkspaceSelectedFilePath(result.filePath);
+        setActiveView("docs");
+        await loadWorkspaceDocument(result.filePath);
+        return;
+      }
+
+      if (result.kind === "event" && result.eventStartAt) {
+        const eventDate = new Date(result.eventStartAt);
+        if (!Number.isNaN(eventDate.getTime())) {
+          setCalendarMonth(startOfMonth(eventDate));
+          setSelectedCalendarDate(toDateKey(eventDate));
+        }
+        setActiveView("calendar");
+        return;
+      }
+
+      if (result.kind === "task") {
+        setActiveView("tasks");
+        return;
+      }
+
+      if (
+        (result.kind === "channel" || (result.kind === "message" && result.threadKind === "channel")) &&
+        result.conversationId
+      ) {
+        await openThread({
+          kind: "channel",
+          conversationId: result.conversationId,
+          label: result.channelName ? `#${result.channelName}` : result.title,
+        });
+        return;
+      }
+
+      if (
+        (result.kind === "dm" || (result.kind === "message" && result.threadKind === "dm")) &&
+        result.otherUserId
+      ) {
+        await openThread({
+          kind: "dm",
+          otherUserId: result.otherUserId,
+          conversationId: result.conversationId,
+          label: result.otherUserName ?? result.title,
+        });
+        return;
+      }
+
+      if (result.kind === "user" && result.userId) {
+        await openThread({
+          kind: "dm",
+          otherUserId: result.userId,
+          conversationId: null,
+          label: result.title,
+        });
+      }
+    },
+    [loadWorkspaceDocument, openThread],
+  );
+
   const submitAgentCommand = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -1224,14 +1722,18 @@ export default function Home() {
       }
       const mentions = commandMentions;
       const contextHints = buildMentionContextHints(mentions);
+      const optimisticId = `optimistic-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const optimisticMessage: ChatMessageView = {
-        id: `optimistic-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: optimisticId,
         role: "user",
         body: input,
         taskId: null,
         createdAt: new Date().toISOString(),
       };
 
+      if (mentions.length > 0) {
+        setMessageMentions((previous) => new Map(previous).set(optimisticId, mentions));
+      }
       setChatMessages((previous) => [...previous, optimisticMessage]);
       setCommandInput("");
       setCommandCursor(0);
@@ -1250,9 +1752,14 @@ export default function Home() {
           }),
         });
 
+        setMessageMentions((previous) => {
+          const next = new Map(previous);
+          next.delete(optimisticId);
+          return next;
+        });
         setChatMessages((previous) => {
           const withoutOptimistic = previous.filter(
-            (message) => message.id !== optimisticMessage.id,
+            (message) => message.id !== optimisticId,
           );
           const existingIds = new Set(withoutOptimistic.map((message) => message.id));
           const next = [...withoutOptimistic];
@@ -1270,8 +1777,13 @@ export default function Home() {
         });
         await refreshAll(activeUserId);
       } catch (commandError) {
+        setMessageMentions((previous) => {
+          const next = new Map(previous);
+          next.delete(optimisticId);
+          return next;
+        });
         setChatMessages((previous) =>
-          previous.filter((message) => message.id !== optimisticMessage.id),
+          previous.filter((message) => message.id !== optimisticId),
         );
         setCommandInput(input);
         setCommandCursor(input.length);
@@ -1293,18 +1805,33 @@ export default function Home() {
         return;
       }
 
-      setSendingManual(true);
+      const optimisticId = `optimistic-msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const optimisticMessage: MessageView = {
+        id: optimisticId,
+        conversationId: selectedThread.kind === "channel" ? selectedThread.conversationId : (selectedThread.conversationId ?? optimisticId),
+        body,
+        createdAt: new Date().toISOString(),
+        isAgentMessage: false,
+        sender: activeUser ?? { id: activeUserId, displayName: "You", avatarColor: "#8fb5ff" },
+      };
+
+      setManualBody("");
+      setManualMessages((previous) => [...previous, optimisticMessage]);
       setError(null);
 
       try {
         if (selectedThread.kind === "channel") {
-          await apiRequest<PostMessageResponse>(
+          const payload = await apiRequest<PostMessageResponse>(
             `/api/conversations/${encodeURIComponent(selectedThread.conversationId)}/messages`,
             activeUserId,
             {
               method: "POST",
               body: JSON.stringify({ body }),
             },
+          );
+
+          setManualMessages((previous) =>
+            previous.map((m) => (m.id === optimisticId ? payload.message : m)),
           );
         } else {
           const payload = await apiRequest<PostDmMessageResponse>(
@@ -1320,18 +1847,19 @@ export default function Home() {
             ...selectedThread,
             conversationId: payload.conversationId,
           });
+          setManualMessages((previous) =>
+            previous.map((m) => (m.id === optimisticId ? payload.message : m)),
+          );
         }
 
-        setManualBody("");
-        await openThread(selectedThread, activeUserId);
         await refreshAll(activeUserId);
       } catch (sendError) {
+        setManualMessages((previous) => previous.filter((m) => m.id !== optimisticId));
+        setManualBody(body);
         setError(toErrorMessage(sendError));
-      } finally {
-        setSendingManual(false);
       }
     },
-    [activeUserId, manualBody, openThread, refreshAll, selectedThread],
+    [activeUser, activeUserId, manualBody, refreshAll, selectedThread],
   );
 
   const updateTaskStatus = useCallback(
@@ -1411,13 +1939,25 @@ export default function Home() {
   const selectUser = useCallback(
     (userId: string) => {
       if (userId !== activeUserId) {
+        globalSearchRequestRef.current += 1;
+        refreshEpochRef.current++;
         setActiveUserId(userId);
+        setBootstrap(null);
         setSelectedThread(null);
         setManualMessages([]);
         setChatMessages([]);
         setCommandInput("");
         setCommandCursor(0);
         setCommandMentions([]);
+        setGlobalSearchInput("");
+        setGlobalSearchQuery("");
+        setGlobalSearchResults([]);
+        setGlobalSearchProviders({
+          chat: "native",
+          files: "native",
+        });
+        setGlobalSearchError(null);
+        setGlobalSearchLoading(false);
         setWorkspaceMentionFiles(null);
         setWorkspaceMentionFilesLoading(false);
         setTasks([]);
@@ -1624,6 +2164,7 @@ export default function Home() {
       ...chatMessages.map((message) => ({
         kind: "chat" as const,
         ...message,
+        mentions: messageMentions.get(message.id),
       })),
       ...briefings.map((briefing) => ({
         kind: "briefing" as const,
@@ -1651,7 +2192,7 @@ export default function Home() {
     });
 
     return timeline;
-  }, [briefings, chatMessages]);
+  }, [briefings, chatMessages, messageMentions]);
 
   const filteredTasks = useMemo(() => {
     const search = taskSearch.trim().toLowerCase();
@@ -2083,13 +2624,45 @@ export default function Home() {
   const channelUnreadCount = channels.reduce((sum, channel) => sum + channel.unreadCount, 0);
   const dmUnreadCount = dms.reduce((sum, dm) => sum + dm.unreadCount, 0);
   const rootDirectoryCount = workspaceFilesByDirectory[""]?.length ?? 0;
+  const workspaceDocumentMode: WorkspaceDocumentMode | null = workspaceDocument
+    ? resolveWorkspaceDocumentMode(workspaceDocument)
+    : null;
+  const workspaceDocumentRawUrl = workspaceDocument
+    ? buildWorkspaceFileRawUrl(workspaceDocument.path, activeUserId)
+    : null;
   const workspaceDocumentDirty =
-    workspaceDocument?.editable === true
-      ? workspaceDocumentContent !== (workspaceDocument.content ?? "")
+    workspaceDocumentMode === "text"
+      ? workspaceDocumentContent !== (workspaceDocument?.content ?? "")
       : false;
   const workspaceSelectedLabel = workspaceSelectedFilePath
     ? workspaceSelectedFilePath.split("/").at(-1) ?? workspaceSelectedFilePath
     : null;
+  const sidebarSearchActive = globalSearchInput.trim().length > 0;
+  const globalSearchResultsByKind = useMemo(() => {
+    const buckets = new Map<GlobalSearchResult["kind"], GlobalSearchResult[]>();
+    for (const result of globalSearchResults) {
+      const current = buckets.get(result.kind) ?? [];
+      current.push(result);
+      buckets.set(result.kind, current);
+    }
+
+    const order: GlobalSearchResult["kind"][] = [
+      "message",
+      "file",
+      "task",
+      "event",
+      "channel",
+      "dm",
+      "user",
+    ];
+
+    return order
+      .map((kind) => ({
+        kind,
+        items: buckets.get(kind) ?? [],
+      }))
+      .filter((bucket) => bucket.items.length > 0);
+  }, [globalSearchResults]);
   const todayKey = toDateKey(new Date());
   const calendarGridDays = useMemo(() => buildCalendarGridDays(calendarMonth), [calendarMonth]);
   const calendarEventsByDay = useMemo(() => {
@@ -2302,9 +2875,11 @@ export default function Home() {
       ? "Tasks"
       : activeView === "calendar"
         ? "Calendar"
-        : activeView === "docs"
-          ? workspaceSelectedLabel ?? "Documents"
-          : selectedThread?.label ?? "Select a Channel or DM";
+        : activeView === "email"
+          ? "Email"
+          : activeView === "docs"
+            ? workspaceSelectedLabel ?? "Documents"
+            : selectedThread?.label ?? "Select a Channel or DM";
 
   return (
     <div className="ow-shell">
@@ -2374,208 +2949,289 @@ export default function Home() {
             ) : null}
           </div>
 
+          <div className="ow-sidebar-search">
+            <div className={`ow-sidebar-search-row${globalSearchLoading ? " is-loading" : ""}`}>
+              <svg className="ow-sidebar-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.6"/>
+                <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+              <input
+                id="ow-sidebar-search-input"
+                type="search"
+                value={globalSearchInput}
+                onChange={(event) => setGlobalSearchInput(event.target.value)}
+                placeholder="Search…"
+                maxLength={180}
+                aria-label="Global search"
+              />
+              {globalSearchInput.trim().length > 0 ? (
+                <button
+                  type="button"
+                  className="ow-sidebar-search-clear"
+                  onClick={clearGlobalSearch}
+                  disabled={globalSearchLoading}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+          </div>
+
           <div className="ow-sidebar-scroll">
-            <div className="ow-sidebar-group">
-              <p className="ow-sidebar-label">Workspace</p>
-              <div className="ow-workspace-nav">
-                <button
-                  type="button"
-                  className={`ow-nav-item ${activeView === "tasks" ? "is-active" : ""}`}
-                  onClick={() => setActiveView("tasks")}
-                >
-                  <span className="ow-nav-item-main">
-                    <span className="ow-nav-item-icon" aria-hidden="true">
-                      ☑
-                    </span>
-                    <span className="ow-nav-item-label">Tasks</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className={`ow-nav-item ${activeView === "calendar" ? "is-active" : ""}`}
-                  onClick={() => setActiveView("calendar")}
-                >
-                  <span className="ow-nav-item-main">
-                    <span className="ow-nav-item-icon" aria-hidden="true">
-                      ◷
-                    </span>
-                    <span className="ow-nav-item-label">Calendar</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className={`ow-nav-item ${activeView === "docs" ? "is-active" : ""}`}
-                  onClick={() => setActiveView("docs")}
-                  disabled={!workspaceSelectedFilePath}
-                >
-                  <span className="ow-nav-item-main">
-                    <span className="ow-nav-item-icon" aria-hidden="true">
-                      ▣
-                    </span>
-                    <span className="ow-nav-item-label">Docs</span>
-                  </span>
-                </button>
-              </div>
-            </div>
+            {sidebarSearchActive ? (
+              <div className="ow-sidebar-group ow-sidebar-search-results-wrap" aria-live="polite">
+                {globalSearchError ? (
+                  <p className="ow-empty-side ow-search-empty-error">{globalSearchError}</p>
+                ) : null}
 
-            <div
-              className={`ow-sidebar-group ow-sidebar-section ${openSidebarSections.has("channels") ? "is-open" : ""}`}
-            >
-              <button
-                type="button"
-                className="ow-section-toggle"
-                onClick={() => toggleSidebarSection("channels")}
-                aria-expanded={openSidebarSections.has("channels")}
-              >
-                <span className="ow-sidebar-label">Channels</span>
-                <span className="ow-section-meta">
-                  {channelUnreadCount > 0 ? (
-                    <span className="ow-count ow-count-unread">{channelUnreadCount}</span>
+                {globalSearchLoading ? (
+                  <p className="ow-empty-side">Searching...</p>
+                ) : globalSearchResults.length === 0 ? (
+                  <p className="ow-empty-side">No results found.</p>
+                ) : (
+                  <div className="ow-sidebar-search-groups">
+                    {globalSearchResultsByKind.map((group) => (
+                      <section key={group.kind} className="ow-sidebar-search-group">
+                        <p className="ow-sidebar-label">
+                          {searchKindLabel(group.kind)} ({group.items.length})
+                        </p>
+                        <ul className="ow-sidebar-search-results">
+                          {group.items.map((result) => (
+                            <li key={`${group.kind}:${result.id}`}>
+                              <button
+                                type="button"
+                                className="ow-sidebar-search-result"
+                                onClick={() => {
+                                  void openGlobalSearchResult(result).catch((openError) => {
+                                    setGlobalSearchError(toErrorMessage(openError));
+                                  });
+                                }}
+                              >
+                                <span className="ow-sidebar-search-title">
+                                  {renderHighlightedText(result.title, result.highlights?.title)}
+                                </span>
+                                {result.subtitle ? (
+                                  <span className="ow-sidebar-search-subtitle">
+                                    {renderHighlightedText(result.subtitle, result.highlights?.subtitle)}
+                                  </span>
+                                ) : null}
+                                {result.snippet ? (
+                                  <span className="ow-sidebar-search-snippet">
+                                    {renderHighlightedText(result.snippet, result.highlights?.snippet)}
+                                  </span>
+                                ) : null}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                )}
+
+                {globalSearchQuery ? (
+                  <p className="ow-empty-side ow-search-provider-meta">
+                    Providers: chat {globalSearchProviders.chat} · files {globalSearchProviders.files}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <>
+                <div className="ow-sidebar-group">
+                  <p className="ow-sidebar-label">Workspace</p>
+                  <div className="ow-workspace-nav">
+                    <button
+                      type="button"
+                      className={`ow-nav-item ${activeView === "tasks" ? "is-active" : ""}`}
+                      onClick={() => setActiveView("tasks")}
+                    >
+                      <span className="ow-nav-item-main">
+                        <span className="ow-nav-item-icon" aria-hidden="true">
+                          ☑
+                        </span>
+                        <span className="ow-nav-item-label">Tasks</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`ow-nav-item ${activeView === "calendar" ? "is-active" : ""}`}
+                      onClick={() => setActiveView("calendar")}
+                    >
+                      <span className="ow-nav-item-main">
+                        <span className="ow-nav-item-icon" aria-hidden="true">
+                          ◷
+                        </span>
+                        <span className="ow-nav-item-label">Calendar</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`ow-nav-item ${activeView === "email" ? "is-active" : ""}`}
+                      onClick={() => setActiveView("email")}
+                    >
+                      <span className="ow-nav-item-main">
+                        <span className="ow-nav-item-icon" aria-hidden="true">
+                          ✉
+                        </span>
+                        <span className="ow-nav-item-label">
+                          Email
+                          {FAKE_EMAILS.filter((e) => !e.read && e.folder === "inbox").length > 0 ? (
+                            <span className="ow-email-nav-badge">
+                              {FAKE_EMAILS.filter((e) => !e.read && e.folder === "inbox").length}
+                            </span>
+                          ) : null}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  className={`ow-sidebar-group ow-sidebar-section ${openSidebarSections.has("channels") ? "is-open" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="ow-section-toggle"
+                    onClick={() => toggleSidebarSection("channels")}
+                    aria-expanded={openSidebarSections.has("channels")}
+                  >
+                    <span className="ow-sidebar-label">Channels</span>
+                    <span className="ow-section-meta">
+                      {channelUnreadCount > 0 ? (
+                        <span className="ow-count ow-count-unread">{channelUnreadCount}</span>
+                      ) : null}
+                      <span className="ow-section-total">{channels.length}</span>
+                      <span className="ow-section-caret" aria-hidden="true">
+                        {openSidebarSections.has("channels") ? "▾" : "▸"}
+                      </span>
+                    </span>
+                  </button>
+
+                  {openSidebarSections.has("channels") ? (
+                    channels.length === 0 ? (
+                      <p className="ow-empty-side">No channels</p>
+                    ) : (
+                      <ul className="ow-thread-list">
+                        {channels.map((channel) => {
+                          const selected =
+                            activeView === "thread" &&
+                            selectedThread?.kind === "channel" &&
+                            selectedThread.conversationId === channel.conversationId;
+
+                          return (
+                            <li key={channel.conversationId}>
+                              <button
+                                type="button"
+                                className={`ow-thread-item ${selected ? "is-active" : ""}`}
+                                onClick={() =>
+                                  void openThread({
+                                    kind: "channel",
+                                    conversationId: channel.conversationId,
+                                    label: `#${channel.channel.name}`,
+                                  })
+                                }
+                              >
+                                <span className="ow-thread-main">
+                                  <span className="ow-thread-prefix" aria-hidden="true">
+                                    #
+                                  </span>
+                                  <span className="ow-thread-name">{channel.channel.name}</span>
+                                </span>
+                                {channel.unreadCount > 0 ? (
+                                  <span className="ow-count ow-count-unread">{channel.unreadCount}</span>
+                                ) : null}
+                                {selected ? (
+                                  <span className="ow-thread-preview">{summarizePreview(channel.lastMessage)}</span>
+                                ) : null}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )
                   ) : null}
-                  <span className="ow-section-total">{channels.length}</span>
-                  <span className="ow-section-caret" aria-hidden="true">
-                    {openSidebarSections.has("channels") ? "▾" : "▸"}
-                  </span>
-                </span>
-              </button>
+                </div>
 
-              {openSidebarSections.has("channels") ? (
-                channels.length === 0 ? (
-                  <p className="ow-empty-side">No channels</p>
-                ) : (
-                  <ul className="ow-thread-list">
-                    {channels.map((channel) => {
-                      const selected =
-                        activeView === "thread" &&
-                        selectedThread?.kind === "channel" &&
-                        selectedThread.conversationId === channel.conversationId;
-
-                      return (
-                        <li key={channel.conversationId}>
-                          <button
-                            type="button"
-                            className={`ow-thread-item ${selected ? "is-active" : ""}`}
-                            onClick={() =>
-                              void openThread({
-                                kind: "channel",
-                                conversationId: channel.conversationId,
-                                label: `#${channel.channel.name}`,
-                              })
-                            }
-                          >
-                            <span className="ow-thread-main">
-                              <span className="ow-thread-prefix" aria-hidden="true">
-                                #
-                              </span>
-                              <span className="ow-thread-name">{channel.channel.name}</span>
-                            </span>
-                            {channel.unreadCount > 0 ? (
-                              <span className="ow-count ow-count-unread">{channel.unreadCount}</span>
-                            ) : null}
-                            {selected ? (
-                              <span className="ow-thread-preview">{summarizePreview(channel.lastMessage)}</span>
-                            ) : null}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )
-              ) : null}
-            </div>
-
-            <div
-              className={`ow-sidebar-group ow-sidebar-section ${openSidebarSections.has("dms") ? "is-open" : ""}`}
-            >
-              <button
-                type="button"
-                className="ow-section-toggle"
-                onClick={() => toggleSidebarSection("dms")}
-                aria-expanded={openSidebarSections.has("dms")}
-              >
-                <span className="ow-sidebar-label">Direct Messages</span>
-                <span className="ow-section-meta">
-                  {dmUnreadCount > 0 ? <span className="ow-count ow-count-unread">{dmUnreadCount}</span> : null}
-                  <span className="ow-section-total">{dms.length}</span>
-                  <span className="ow-section-caret" aria-hidden="true">
-                    {openSidebarSections.has("dms") ? "▾" : "▸"}
-                  </span>
-                </span>
-              </button>
-
-              {openSidebarSections.has("dms") ? (
-                dms.length === 0 ? (
-                  <p className="ow-empty-side">No direct messages</p>
-                ) : (
-                  <ul className="ow-thread-list">
-                    {dms.map((dm) => {
-                      const selected =
-                        activeView === "thread" &&
-                        selectedThread?.kind === "dm" &&
-                        selectedThread.otherUserId === dm.otherUser.id;
-
-                      return (
-                        <li key={dm.otherUser.id}>
-                          <button
-                            type="button"
-                            className={`ow-thread-item ${selected ? "is-active" : ""}`}
-                            onClick={() =>
-                              void openThread({
-                                kind: "dm",
-                                otherUserId: dm.otherUser.id,
-                                conversationId: dm.conversationId,
-                                label: dm.otherUser.displayName,
-                              })
-                            }
-                          >
-                            <span className="ow-thread-main">
-                              <span className="ow-thread-prefix ow-thread-prefix-dm" aria-hidden="true">
-                                <span
-                                  className="ow-thread-presence"
-                                  style={{ backgroundColor: dm.otherUser.avatarColor }}
-                                />
-                              </span>
-                              <span className="ow-thread-name">{dm.otherUser.displayName}</span>
-                            </span>
-                            {dm.unreadCount > 0 ? (
-                              <span className="ow-count ow-count-unread">{dm.unreadCount}</span>
-                            ) : null}
-                            {selected ? (
-                              <span className="ow-thread-preview">{summarizePreview(dm.lastMessage)}</span>
-                            ) : null}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )
-              ) : null}
-            </div>
-
-            <div
-              className={`ow-sidebar-group ow-sidebar-section ow-sidebar-files ${
-                openSidebarSections.has("files") ? "is-open" : ""
-              }`}
-            >
-              <div className="ow-sidebar-files-head">
-                <button
-                  type="button"
-                  className="ow-section-toggle"
-                  onClick={() => toggleSidebarSection("files")}
-                  aria-expanded={openSidebarSections.has("files")}
+                <div
+                  className={`ow-sidebar-group ow-sidebar-section ${openSidebarSections.has("dms") ? "is-open" : ""}`}
                 >
-                  <span className="ow-sidebar-label">Company Files</span>
-                  <span className="ow-section-meta">
-                    <span className="ow-section-total">{rootDirectoryCount}</span>
-                    <span className="ow-section-caret" aria-hidden="true">
-                      {openSidebarSections.has("files") ? "▾" : "▸"}
+                  <button
+                    type="button"
+                    className="ow-section-toggle"
+                    onClick={() => toggleSidebarSection("dms")}
+                    aria-expanded={openSidebarSections.has("dms")}
+                  >
+                    <span className="ow-sidebar-label">Direct Messages</span>
+                    <span className="ow-section-meta">
+                      {dmUnreadCount > 0 ? (
+                        <span className="ow-count ow-count-unread">{dmUnreadCount}</span>
+                      ) : null}
+                      <span className="ow-section-total">{dms.length}</span>
+                      <span className="ow-section-caret" aria-hidden="true">
+                        {openSidebarSections.has("dms") ? "▾" : "▸"}
+                      </span>
                     </span>
-                  </span>
-                </button>
-              </div>
+                  </button>
 
-              {openSidebarSections.has("files") ? (
-                <>
+                  {openSidebarSections.has("dms") ? (
+                    dms.length === 0 ? (
+                      <p className="ow-empty-side">No direct messages</p>
+                    ) : (
+                      <ul className="ow-thread-list">
+                        {dms.map((dm) => {
+                          const selected =
+                            activeView === "thread" &&
+                            selectedThread?.kind === "dm" &&
+                            selectedThread.otherUserId === dm.otherUser.id;
+
+                          return (
+                            <li key={dm.otherUser.id}>
+                              <button
+                                type="button"
+                                className={`ow-thread-item ${selected ? "is-active" : ""}`}
+                                onClick={() =>
+                                  void openThread({
+                                    kind: "dm",
+                                    otherUserId: dm.otherUser.id,
+                                    conversationId: dm.conversationId,
+                                    label: dm.otherUser.displayName,
+                                  })
+                                }
+                              >
+                                <span className="ow-thread-main">
+                                  <span className="ow-thread-prefix ow-thread-prefix-dm" aria-hidden="true">
+                                    <span
+                                      className="ow-thread-presence"
+                                      style={{ backgroundColor: dm.otherUser.avatarColor }}
+                                    />
+                                  </span>
+                                  <span className="ow-thread-name">{dm.otherUser.displayName}</span>
+                                </span>
+                                {dm.unreadCount > 0 ? (
+                                  <span className="ow-count ow-count-unread">{dm.unreadCount}</span>
+                                ) : null}
+                                {selected ? (
+                                  <span className="ow-thread-preview">{summarizePreview(dm.lastMessage)}</span>
+                                ) : null}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )
+                  ) : null}
+                </div>
+
+                <div
+                  className={`ow-sidebar-group ow-sidebar-section ow-sidebar-files ${
+                    openSidebarSections.has("files") ? "is-open" : ""
+                  }`}
+                >
+                  <div className="ow-sidebar-files-head">
+                    <span className="ow-sidebar-label">Company Files</span>
+                  </div>
+
                   {workspaceFilesError ? <p className="ow-side-file-status">{workspaceFilesError}</p> : null}
 
                   <div className="ow-side-files-wrap">
@@ -2590,7 +3246,6 @@ export default function Home() {
                       <span className="ow-side-file-caret" aria-hidden="true">
                         <DisclosureChevron expanded={expandedDirectories.has("")} />
                       </span>
-                      <span className="ow-side-file-chip is-directory">ROOT</span>
                       <span className="ow-side-file-label">{workspaceRootLabel}</span>
                     </button>
 
@@ -2604,9 +3259,9 @@ export default function Home() {
                       )
                     ) : null}
                   </div>
-                </>
-              ) : null}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </aside>
 
@@ -2628,9 +3283,11 @@ export default function Home() {
                 ? "Tasks"
                 : activeView === "calendar"
                   ? "Calendar"
-                  : activeView === "docs"
-                    ? "Documents"
-                    : "Conversation"}
+                  : activeView === "email"
+                    ? "Inbox"
+                    : activeView === "docs"
+                      ? "Documents"
+                      : "Conversation"}
             </p>
             <h2 className="ow-main-title">{mainTitle}</h2>
           </header>
@@ -2984,27 +3641,23 @@ export default function Home() {
                             {formatDate(workspaceDocument.updatedAt)}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          className="ow-files-refresh"
-                          onClick={() => void saveWorkspaceDocument()}
-                          disabled={
-                            !workspaceDocument.editable ||
-                            !workspaceDocumentDirty ||
-                            workspaceDocumentSaving ||
-                            workspaceAiApplying
-                          }
-                        >
-                          {workspaceDocumentSaving ? "Saving…" : "Save"}
-                        </button>
+                        {workspaceDocumentMode === "text" ? (
+                          <button
+                            type="button"
+                            className="ow-files-refresh"
+                            onClick={() => void saveWorkspaceDocument()}
+                            disabled={
+                              !workspaceDocumentDirty ||
+                              workspaceDocumentSaving ||
+                              workspaceAiApplying
+                            }
+                          >
+                            {workspaceDocumentSaving ? "Saving…" : "Save"}
+                          </button>
+                        ) : null}
                       </div>
 
-                      {!workspaceDocument.editable ? (
-                        <p className="ow-hint">
-                          {workspaceDocument.message ??
-                            "This file can be listed, but editing requires a Univer adapter."}
-                        </p>
-                      ) : (
+                      {workspaceDocumentMode === "text" ? (
                         <>
                           <textarea
                             className="ow-docs-editor"
@@ -3042,6 +3695,44 @@ export default function Home() {
                             </div>
                           </form>
                         </>
+                      ) : workspaceDocumentMode === "univer" ? (
+                        <WorkspaceUniverEditor
+                          userId={activeUserId}
+                          filePath={workspaceDocument.path}
+                          extension={workspaceDocument.extension}
+                          version={workspaceDocument.version}
+                          onSaved={handleUniverDocumentSaved}
+                        />
+                      ) : workspaceDocumentMode === "pdf" ? (
+                        <>
+                          <p className="ow-hint">
+                            {workspaceDocument.message ?? "PDF files are preview-only in this workspace."}
+                          </p>
+                          {workspaceDocumentRawUrl ? (
+                            <iframe
+                              className="ow-doc-preview-frame"
+                              src={workspaceDocumentRawUrl}
+                              title={`Preview ${workspaceDocument.name}`}
+                            />
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          <p className="ow-hint">
+                            {workspaceDocument.message ??
+                              "Read-only preview for this file type is limited in the current workspace view."}
+                          </p>
+                          {workspaceDocumentRawUrl ? (
+                            <a
+                              className="ow-doc-download-link"
+                              href={workspaceDocumentRawUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open raw file
+                            </a>
+                          ) : null}
+                        </>
                       )}
                     </>
                   ) : (
@@ -3049,6 +3740,172 @@ export default function Home() {
                   )}
                 </>
               )}
+            </section>
+          ) : activeView === "email" ? (
+            <section className="ow-pane ow-email-pane">
+              {/* Gmail-style left folder nav */}
+              <nav className="ow-email-nav" aria-label="Email folders">
+                <button
+                  type="button"
+                  className="ow-email-compose-btn"
+                  onClick={() => {
+                    setEmailFolder("drafts");
+                    setSelectedEmailId(null);
+                  }}
+                >
+                  <span aria-hidden="true">✎</span> Compose
+                </button>
+                {(["inbox", "sent", "drafts", "spam"] as EmailFolder[]).map((folder) => {
+                  const count = FAKE_EMAILS.filter((e) => e.folder === folder && !e.read).length;
+                  return (
+                    <button
+                      key={folder}
+                      type="button"
+                      className={`ow-email-folder-btn ${emailFolder === folder ? "is-active" : ""}`}
+                      onClick={() => {
+                        setEmailFolder(folder);
+                        setSelectedEmailId(null);
+                      }}
+                    >
+                      <span className="ow-email-folder-icon" aria-hidden="true">
+                        {folder === "inbox" ? "📥" : folder === "sent" ? "📤" : folder === "drafts" ? "📝" : "🚫"}
+                      </span>
+                      <span className="ow-email-folder-label">
+                        {folder.charAt(0).toUpperCase() + folder.slice(1)}
+                      </span>
+                      {count > 0 ? (
+                        <span className="ow-email-folder-count">{count}</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+                <div className="ow-email-nav-divider" />
+                <button
+                  type="button"
+                  className={`ow-email-folder-btn ${emailFolder === "inbox" && false ? "is-active" : ""}`}
+                  style={{ opacity: 0.6 }}
+                >
+                  <span className="ow-email-folder-icon" aria-hidden="true">⭐</span>
+                  <span className="ow-email-folder-label">Starred</span>
+                  <span className="ow-email-folder-count">
+                    {FAKE_EMAILS.filter((e) => e.starred).length}
+                  </span>
+                </button>
+              </nav>
+
+              {/* Email list */}
+              <div className="ow-email-list-col">
+                <div className="ow-email-list-toolbar">
+                  <input
+                    type="search"
+                    className="ow-email-search"
+                    placeholder="Search mail"
+                    value={emailSearchInput}
+                    onChange={(event) => setEmailSearchInput(event.target.value)}
+                    aria-label="Search email"
+                  />
+                  <span className="ow-email-list-meta">
+                    {FAKE_EMAILS.filter((e) => e.folder === emailFolder).length} conversations
+                  </span>
+                </div>
+                <ul className="ow-email-list" aria-label="Email list">
+                  {FAKE_EMAILS.filter((e) => {
+                    if (e.folder !== emailFolder) return false;
+                    if (!emailSearchInput.trim()) return true;
+                    const q = emailSearchInput.toLowerCase();
+                    return (
+                      e.subject.toLowerCase().includes(q) ||
+                      e.from.toLowerCase().includes(q) ||
+                      e.preview.toLowerCase().includes(q)
+                    );
+                  }).map((email) => (
+                    <li key={email.id}>
+                      <button
+                        type="button"
+                        className={`ow-email-row ${!email.read ? "is-unread" : ""} ${selectedEmailId === email.id ? "is-selected" : ""}`}
+                        onClick={() => setSelectedEmailId(email.id)}
+                        aria-pressed={selectedEmailId === email.id}
+                      >
+                        <span
+                          className={`ow-email-star ${email.starred ? "is-starred" : ""}`}
+                          aria-label={email.starred ? "Starred" : "Not starred"}
+                        >
+                          {email.starred ? "★" : "☆"}
+                        </span>
+                        <span className="ow-email-from">{email.from}</span>
+                        <span className="ow-email-subject-preview">
+                          <span className="ow-email-subject">{email.subject}</span>
+                          <span className="ow-email-preview"> — {email.preview}</span>
+                        </span>
+                        <span className="ow-email-date">
+                          {new Date(email.date).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                  {FAKE_EMAILS.filter((e) => e.folder === emailFolder).length === 0 ? (
+                    <li>
+                      <p className="ow-hint" style={{ padding: "24px 16px" }}>No messages in {emailFolder}.</p>
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
+
+              {/* Email detail */}
+              <div className="ow-email-detail">
+                {selectedEmailId ? (() => {
+                  const email = FAKE_EMAILS.find((e) => e.id === selectedEmailId);
+                  if (!email) return null;
+                  return (
+                    <>
+                      <div className="ow-email-detail-head">
+                        <h2 className="ow-email-detail-subject">{email.subject}</h2>
+                        <div className="ow-email-detail-meta">
+                          <div className="ow-email-detail-avatar" aria-hidden="true">
+                            {email.from.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="ow-email-detail-from-block">
+                            <div className="ow-email-detail-from-name">
+                              <strong>{email.from}</strong>
+                              <span className="ow-email-detail-from-addr">&lt;{email.fromEmail}&gt;</span>
+                            </div>
+                            <div className="ow-email-detail-to">
+                              To: {email.to}
+                            </div>
+                          </div>
+                          <div className="ow-email-detail-date">
+                            {new Date(email.date).toLocaleString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="ow-email-detail-body">
+                        {email.body.split("\n").map((line, index) => (
+                          <p key={index} className="ow-email-body-line">
+                            {line || "\u00A0"}
+                          </p>
+                        ))}
+                      </div>
+                      <div className="ow-email-reply-bar">
+                        <button type="button" className="ow-email-reply-btn">↩ Reply</button>
+                        <button type="button" className="ow-email-reply-btn">↪ Forward</button>
+                      </div>
+                    </>
+                  );
+                })() : (
+                  <div className="ow-email-empty-detail">
+                    <p className="ow-email-empty-icon" aria-hidden="true">✉</p>
+                    <p>Select an email to read it</p>
+                  </div>
+                )}
+              </div>
             </section>
           ) : (
             <section className="ow-pane ow-thread-pane">
@@ -3079,14 +3936,18 @@ export default function Home() {
                               style={{ backgroundColor: item.message.sender.avatarColor }}
                               aria-hidden="true"
                             >
-                              {initialsFromName(item.message.sender.displayName)}
+                              {item.message.isAgentMessage
+                                ? `${initialsFromName(item.message.sender.displayName)}-AI`
+                                : initialsFromName(item.message.sender.displayName)}
                             </span>
                           )}
                           <div className="ow-message-content">
                             {item.compact ? null : (
                               <div className="ow-message-head">
                                 <strong className="ow-message-sender">
-                                  {item.message.sender.displayName}
+                                  {item.message.isAgentMessage
+                                    ? `${item.message.sender.displayName}'s AI`
+                                    : item.message.sender.displayName}
                                 </strong>
                                 <span className="ow-message-time">
                                   {formatMessageTime(item.message.createdAt)}
@@ -3110,6 +3971,12 @@ export default function Home() {
                   id="ow-thread-input"
                   value={manualBody}
                   onChange={(event) => setManualBody(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }}
                   rows={3}
                   maxLength={2000}
                   placeholder={
@@ -3117,14 +3984,8 @@ export default function Home() {
                       ? "Write a message…"
                       : "Select a channel or DM to start messaging…"
                   }
-                  disabled={!selectedThread || sendingManual}
+                  disabled={!selectedThread}
                 />
-                <button
-                  type="submit"
-                  disabled={!selectedThread || sendingManual || manualBody.trim().length === 0}
-                >
-                  {sendingManual ? "Sending…" : "Send Message"}
-                </button>
               </form>
             </section>
           )}
@@ -3136,14 +3997,29 @@ export default function Home() {
               <p className="ow-ai-panel-kicker">Assistant</p>
               <h3 className="ow-ai-panel-title">AI Chat</h3>
             </div>
-            <button
-              type="button"
-              className="ow-ai-panel-collapse"
-              onClick={() => setAiPanelOpen(false)}
-              aria-label="Hide AI Chat Panel"
-            >
-              {"\u203A"}
-            </button>
+            <div className="ow-ai-panel-head-actions">
+              <button
+                type="button"
+                className="ow-ai-new-chat"
+                onClick={clearChat}
+                title="New chat"
+                aria-label="Start a new chat"
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <rect x="2" y="2" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 5h6M5 8h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  <path d="M11.5 10.5l2.5-2.5-1.5-1.5-2.5 2.5V11h1.5z" fill="currentColor"/>
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="ow-ai-panel-collapse"
+                onClick={() => setAiPanelOpen(false)}
+                aria-label="Hide AI Chat Panel"
+              >
+                {"\u203A"}
+              </button>
+            </div>
           </header>
 
           <section className="ow-pane ow-ai-pane">
@@ -3158,12 +4034,26 @@ export default function Home() {
                   const messageBody = item.body;
                   const messageKey = item.kind === "chat" ? item.id : `briefing-${item.id}`;
 
+                  const itemMentions = item.kind === "chat" ? item.mentions : undefined;
+
                   return (
                     <article key={messageKey} className={`ow-turn ${isUserMessage ? "ow-turn-user" : "ow-turn-ai"}`}>
                       {!isUserMessage && (
                         <div className="ow-turn-head">
                           <strong>AI</strong>
                           <span>{formatDate(item.createdAt)}</span>
+                        </div>
+                      )}
+                      {isUserMessage && itemMentions && itemMentions.length > 0 && (
+                        <div className="ow-turn-mention-pills">
+                          {itemMentions.map((mention) => (
+                            <span key={mentionKey(mention)} className="ow-turn-mention-pill">
+                              <span className="ow-mention-chip-sigil" aria-hidden="true">
+                                {mention.kind === "channel" ? "#" : mention.kind === "dm" ? "@" : mention.kind === "file" ? "↗" : mention.kind === "task" ? "✓" : "◷"}
+                              </span>
+                              {mentionLabel(mention)}
+                            </span>
+                          ))}
                         </div>
                       )}
                       <p style={{ whiteSpace: "pre-wrap" }}>{messageBody}</p>
@@ -3177,76 +4067,80 @@ export default function Home() {
 
             <form className="ow-command-form" onSubmit={submitAgentCommand}>
               <label htmlFor="ow-command-input">Message</label>
-              <textarea
-                id="ow-command-input"
-                ref={commandInputRef}
-                value={commandInput}
-                onChange={(event) => {
-                  setCommandInput(event.target.value);
-                  setCommandCursor(event.target.selectionStart ?? event.target.value.length);
-                }}
-                onSelect={(event) => {
-                  setCommandCursor(event.currentTarget.selectionStart ?? commandInput.length);
-                }}
-                onClick={(event) => {
-                  setCommandCursor(event.currentTarget.selectionStart ?? commandInput.length);
-                }}
-                onKeyUp={(event) => {
-                  setCommandCursor(event.currentTarget.selectionStart ?? commandInput.length);
-                }}
-                rows={3}
-                maxLength={2000}
-                placeholder="Tell AI what to do…"
-                disabled={commandRunning}
-                onKeyDown={(event) => {
-                  if (mentionPickerOpen && mentionSuggestionsReady) {
-                    if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      setMentionNavIndex((previous) => (previous + 1) % mentionSuggestions.length);
-                      return;
-                    }
+              <div className={`ow-command-input-box${commandMentions.length > 0 ? " has-chips" : ""}`}>
+                {commandMentions.length > 0 ? (
+                  <div className="ow-mention-chip-list" aria-label="Attached context">
+                    {commandMentions.map((mention) => (
+                      <button
+                        key={mentionKey(mention)}
+                        type="button"
+                        className="ow-mention-chip"
+                        onClick={() => removeMention(mention)}
+                        title="Remove context"
+                      >
+                        <span className="ow-mention-chip-sigil" aria-hidden="true">
+                          {mention.kind === "channel" ? "#" : mention.kind === "dm" ? "@" : mention.kind === "file" ? "↗" : mention.kind === "task" ? "✓" : "◷"}
+                        </span>
+                        <span className="ow-mention-chip-label">{mentionLabel(mention)}</span>
+                        <span className="ow-mention-chip-remove" aria-hidden="true">×</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <textarea
+                  id="ow-command-input"
+                  ref={commandInputRef}
+                  value={commandInput}
+                  onChange={(event) => {
+                    setCommandInput(event.target.value);
+                    setCommandCursor(event.target.selectionStart ?? event.target.value.length);
+                  }}
+                  onSelect={(event) => {
+                    setCommandCursor(event.currentTarget.selectionStart ?? commandInput.length);
+                  }}
+                  onClick={(event) => {
+                    setCommandCursor(event.currentTarget.selectionStart ?? commandInput.length);
+                  }}
+                  onKeyUp={(event) => {
+                    setCommandCursor(event.currentTarget.selectionStart ?? commandInput.length);
+                  }}
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Tell AI what to do…"
+                  disabled={commandRunning}
+                  onKeyDown={(event) => {
+                    if (mentionPickerOpen && mentionSuggestionsReady) {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setMentionNavIndex((previous) => (previous + 1) % mentionSuggestions.length);
+                        return;
+                      }
 
-                    if (event.key === "ArrowUp") {
-                      event.preventDefault();
-                      setMentionNavIndex((previous) =>
-                        (previous - 1 + mentionSuggestions.length) % mentionSuggestions.length,
-                      );
-                      return;
+                      if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setMentionNavIndex((previous) =>
+                          (previous - 1 + mentionSuggestions.length) % mentionSuggestions.length,
+                        );
+                        return;
+                      }
+
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        const next = mentionSuggestions[mentionNavIndex] ?? mentionSuggestions[0];
+                        if (next) {
+                          applyMentionSuggestion(next);
+                        }
+                        return;
+                      }
                     }
 
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
-                      const next = mentionSuggestions[mentionNavIndex] ?? mentionSuggestions[0];
-                      if (next) {
-                        applyMentionSuggestion(next);
-                      }
-                      return;
+                      event.currentTarget.form?.requestSubmit();
                     }
-                  }
-
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    event.currentTarget.form?.requestSubmit();
-                  }
-                }}
-              />
-              {commandMentions.length > 0 ? (
-                <div className="ow-mention-chip-list" aria-label="Attached context">
-                  {commandMentions.map((mention) => (
-                    <button
-                      key={mentionKey(mention)}
-                      type="button"
-                      className="ow-mention-chip"
-                      onClick={() => removeMention(mention)}
-                      title="Remove context"
-                    >
-                      <span className="ow-mention-chip-kind">{mentionKindLabel(mention.kind)}</span>
-                      <span className="ow-mention-chip-label">{mentionLabel(mention)}</span>
-                      <span aria-hidden="true">×</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+                  }}
+                />
+              </div>
               {mentionPickerOpen ? (
                 <div className="ow-mention-picker" role="listbox" aria-label="Context suggestions">
                   {mentionSuggestionsReady ? (

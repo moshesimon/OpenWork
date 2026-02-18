@@ -200,6 +200,7 @@ export async function buildContextPack(
     relevanceProfile,
     messages,
     chatMessages,
+    briefings,
   ] = await Promise.all([
     db.user.findUniqueOrThrow({
       where: { id: userId },
@@ -283,6 +284,21 @@ export async function buildContextPack(
       take: 50,
       select: { role: true, body: true },
     }),
+    db.briefingItem.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        importance: true,
+        status: true,
+        sourceConversationId: true,
+        sourceMessageIdsJson: true,
+        createdAt: true,
+      },
+    }),
   ]);
 
   return {
@@ -334,6 +350,16 @@ export async function buildContextPack(
       startAt: event.startAt.toISOString(),
       endAt: event.endAt.toISOString(),
       allDay: event.allDay,
+    })),
+    recentBriefings: briefings.map((briefing) => ({
+      id: briefing.id,
+      title: briefing.title,
+      summary: briefing.summary,
+      importance: briefing.importance,
+      status: briefing.status,
+      sourceConversationId: briefing.sourceConversationId,
+      sourceMessageIds: jsonStringArray(briefing.sourceMessageIdsJson),
+      createdAt: briefing.createdAt.toISOString(),
     })),
     relevanceProfile: {
       priorityPeople: jsonStringArray(relevanceProfile?.priorityPeopleJson),

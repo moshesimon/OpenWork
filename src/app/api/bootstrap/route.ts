@@ -8,11 +8,10 @@ import { runBootstrapAnalysisJob } from "@/trigger/client";
 export async function GET(request: NextRequest) {
   try {
     const userId = requireUserIdHeader(request);
-    try {
-      await runBootstrapAnalysisJob({ userId });
-    } catch (analysisError) {
+    // Fire-and-forget — don't block the bootstrap response on analysis
+    void runBootstrapAnalysisJob({ userId }).catch((analysisError) => {
       console.warn("Bootstrap proactive analysis failed:", analysisError);
-    }
+    });
     const payload = await getBootstrapData(prisma, userId);
     return NextResponse.json(payload);
   } catch (error) {

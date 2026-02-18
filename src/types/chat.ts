@@ -10,6 +10,7 @@ export type MessageView = {
   sender: PublicUser;
   body: string;
   createdAt: string;
+  isAgentMessage: boolean;
 };
 
 export type MessagePreview = {

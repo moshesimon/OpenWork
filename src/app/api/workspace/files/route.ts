@@ -7,7 +7,6 @@ import {
   normalizeWorkspaceRelativePath,
   resolveWorkspacePath,
   shouldIncludeDirectory,
-  isSupportedDocumentFile,
   WORKSPACE_ROOT,
 } from "@/server/workspace-files";
 import type { WorkspaceFileEntry } from "@/types/agent";
@@ -34,7 +33,7 @@ export async function GET(request: NextRequest) {
           return shouldIncludeDirectory(entry.name);
         }
 
-        return entry.isFile() && isSupportedDocumentFile(entry.name) && !entry.name.startsWith("~$");
+        return entry.isFile() && !entry.name.startsWith(".") && !entry.name.startsWith("~$");
       })
       .map((entry) => {
         const kind: WorkspaceFileEntry["kind"] = entry.isDirectory() ? "directory" : "file";

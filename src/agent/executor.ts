@@ -13,9 +13,6 @@ export type ExecutionInput = {
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
-function appendAiAttribution(body: string, displayName: string): string {
-  return `${body}\n\n— ${displayName}'s AI`;
-}
 
 function toSlug(value: string): string {
   return value
@@ -94,13 +91,7 @@ export async function executeSendAction(
     throw new Error("No target conversation resolved for send action.");
   }
 
-  const sender = await db.user.findUnique({
-    where: { id: input.userId },
-    select: { displayName: true },
-  });
-  const aiLabelName = sender?.displayName?.trim() || "User";
-  const finalBody = appendAiAttribution(input.body, aiLabelName);
-  const payload = await createConversationMessage(db, input.userId, conversationId, finalBody);
+  const payload = await createConversationMessage(db, input.userId, conversationId, input.body);
 
   await db.outboundDelivery.create({
     data: {
@@ -118,7 +109,7 @@ export async function executeSendAction(
   return {
     conversationId,
     messageId: payload.message.id,
-    finalBody,
+    finalBody: input.body,
   };
 }
 

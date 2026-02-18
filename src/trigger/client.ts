@@ -1,12 +1,8 @@
 import { tasks } from "@trigger.dev/sdk/v3";
-import type { ProactiveInput, RunCommandInput, RunCommandResult } from "@/agent/orchestrator";
-import { maybeRunBootstrapAnalysis, runAgentCommand, runProactiveAnalysis } from "@/agent/orchestrator";
+import type { AgentTurnRequest, AgentTurnResult } from "@/agent/orchestrator";
+import { maybeRunBootstrapAnalysis, runAgentTurn } from "@/agent/orchestrator";
 import { prisma } from "@/lib/prisma";
-import type {
-  runAgentCommandTask,
-  runBootstrapAnalysisTask,
-  runProactiveAnalysisTask,
-} from "@/trigger/agent-tasks";
+import type { runAgentTurnTask, runBootstrapAnalysisTask } from "@/trigger/agent-tasks";
 
 type BootstrapInput = {
   userId: string;
@@ -29,26 +25,34 @@ function stringifyError(error: unknown): string {
   return JSON.stringify(error);
 }
 
-export async function runAgentCommandJob(input: RunCommandInput): Promise<RunCommandResult> {
-  if (!isTriggerConfigured()) {
-    return runAgentCommand(prisma, input);
+function isSystemEventTurnEnabled(): boolean {
+  const raw = process.env.AGENT_SYSTEM_EVENT_TURNS_ENABLED;
+  if (raw === undefined) {
+    return true;
   }
 
-  const result = await tasks.triggerAndWait<typeof runAgentCommandTask>("agent-run-command", input);
+  const normalized = raw.trim().toLowerCase();
+  return !["0", "false", "off", "no"].includes(normalized);
+}
+
+export async function runAgentTurnJob(input: AgentTurnRequest): Promise<AgentTurnResult> {
+  if (input.trigger.type === "SYSTEM_EVENT" && !isSystemEventTurnEnabled()) {
+    return {
+      triggerType: "SYSTEM_EVENT",
+      handled: true,
+    };
+  }
+
+  if (!isTriggerConfigured()) {
+    return runAgentTurn(prisma, input);
+  }
+
+  const result = await tasks.triggerAndWait<typeof runAgentTurnTask>("agent-run-turn", input);
   if (result.ok) {
     return result.output;
   }
 
   throw new Error(`Trigger run failed: ${stringifyError(result.error)}`);
-}
-
-export async function runProactiveAnalysisJob(input: ProactiveInput): Promise<void> {
-  if (!isTriggerConfigured()) {
-    await runProactiveAnalysis(prisma, input);
-    return;
-  }
-
-  await tasks.trigger<typeof runProactiveAnalysisTask>("agent-run-proactive-analysis", input);
 }
 
 export async function runBootstrapAnalysisJob(input: BootstrapInput): Promise<void> {

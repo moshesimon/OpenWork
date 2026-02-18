@@ -4,7 +4,7 @@ import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { parseJsonBody, requireUserIdHeader } from "@/lib/request";
 import { updateBriefingStatus } from "@/server/agent-service";
-import { runAgentCommandJob } from "@/trigger/client";
+import { runAgentTurnJob } from "@/trigger/client";
 
 type Params = {
   id: string;
@@ -23,8 +23,19 @@ export async function POST(
 
     let followupTaskId: string | null = null;
     if (typeof body.input === "string" && body.input.trim().length > 0) {
-      const result = await runAgentCommandJob({ userId, input: body.input });
-      followupTaskId = result.taskId;
+      const result = await runAgentTurnJob({
+        userId,
+        trigger: {
+          type: "USER_MESSAGE",
+          payload: {
+            input: body.input,
+          },
+        },
+      });
+
+      if (result.triggerType === "USER_MESSAGE") {
+        followupTaskId = result.taskId;
+      }
     }
 
     return NextResponse.json({

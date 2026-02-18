@@ -3,6 +3,16 @@ import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { requireUserIdHeader } from "@/lib/request";
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = requireUserIdHeader(request);
+    await prisma.agentChatMessage.deleteMany({ where: { userId } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const userId = requireUserIdHeader(request);

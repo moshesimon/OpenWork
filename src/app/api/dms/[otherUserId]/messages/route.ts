@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { parseJsonBody, requireUserIdHeader } from "@/lib/request";
 import { createDmMessage, getDmMessagesPage } from "@/server/chat-service";
 import { publishRealtimeEvent } from "@/server/realtime-events";
-import { runProactiveAnalysisJob } from "@/trigger/client";
+import { runAgentTurnJob } from "@/trigger/client";
 
 type Params = {
   otherUserId: string;
@@ -49,16 +49,21 @@ export async function POST(
     });
 
     try {
-      await runProactiveAnalysisJob({
+      await runAgentTurnJob({
         userId: otherUserId,
-        source: AgentTaskSource.INBOUND_DM_MESSAGE,
-        triggerRef: response.message.id,
-        event: {
-          sourceConversationId: response.message.conversationId,
-          sourceMessageId: response.message.id,
-          sourceSenderId: response.message.sender.id,
-          messageBody: response.message.body,
-          isDm: true,
+        trigger: {
+          type: "SYSTEM_EVENT",
+          payload: {
+            source: AgentTaskSource.INBOUND_DM_MESSAGE,
+            triggerRef: response.message.id,
+            event: {
+              sourceConversationId: response.message.conversationId,
+              sourceMessageId: response.message.id,
+              sourceSenderId: response.message.sender.id,
+              messageBody: response.message.body,
+              isDm: true,
+            },
+          },
         },
         contextHints: {
           userIds: [userId, otherUserId],

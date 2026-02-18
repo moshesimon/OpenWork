@@ -35,7 +35,7 @@ describe("orchestrator calendar intents", () => {
   let tempDir: string;
   let databaseUrl: string;
   let initSqlPath: string;
-  let runAgentCommandFn: (typeof import("@/agent/orchestrator"))["runAgentCommand"];
+  let runAgentTurnFn: (typeof import("@/agent/orchestrator"))["runAgentTurn"];
   const originalProvider = process.env.AI_PROVIDER;
   const originalDatabaseUrl = process.env.DATABASE_URL;
 
@@ -63,7 +63,7 @@ describe("orchestrator calendar intents", () => {
     prisma = new PrismaClient({ adapter });
 
     process.env.DATABASE_URL = databaseUrl;
-    ({ runAgentCommand: runAgentCommandFn } = await import("@/agent/orchestrator"));
+    ({ runAgentTurn: runAgentTurnFn } = await import("@/agent/orchestrator"));
   });
 
   beforeEach(async () => {
@@ -89,13 +89,31 @@ describe("orchestrator calendar intents", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
+  async function runUserMessageTurn(userId: string, input: string): Promise<{ taskId: string; reply: string }> {
+    const result = await runAgentTurnFn(prisma, {
+      userId,
+      trigger: {
+        type: "USER_MESSAGE",
+        payload: {
+          input,
+        },
+      },
+    });
+
+    if (result.triggerType !== "USER_MESSAGE") {
+      throw new Error("Expected USER_MESSAGE result.");
+    }
+
+    return result;
+  }
+
   it("creates, updates, and deletes calendar events from AI commands", async () => {
     const calendarEvent = getCalendarEventDelegate(prisma);
 
-    const createResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: 'Schedule a meeting "Roadmap review" tomorrow at 3pm for 45 minutes',
-    });
+    const createResult = await runUserMessageTurn(
+      "u_alex",
+      'Schedule a meeting "Roadmap review" tomorrow at 3pm for 45 minutes',
+    );
 
     expect(createResult.reply).toContain('Created calendar event "Roadmap review"');
 
@@ -107,10 +125,10 @@ describe("orchestrator calendar intents", () => {
 
     const originalStart = created?.startAt.toISOString();
 
-    const updateResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: 'Reschedule "Roadmap review" to tomorrow at 4pm',
-    });
+    const updateResult = await runUserMessageTurn(
+      "u_alex",
+      'Reschedule "Roadmap review" to tomorrow at 4pm',
+    );
 
     expect(updateResult.reply).toContain('Updated calendar event "Roadmap review"');
 
@@ -121,10 +139,7 @@ describe("orchestrator calendar intents", () => {
     expect(updated).toBeTruthy();
     expect(updated?.startAt.toISOString()).not.toBe(originalStart);
 
-    const deleteResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: 'Cancel meeting "Roadmap review"',
-    });
+    const deleteResult = await runUserMessageTurn("u_alex", 'Cancel meeting "Roadmap review"');
 
     expect(deleteResult.reply).toContain('Deleted calendar event "Roadmap review"');
 
@@ -136,10 +151,7 @@ describe("orchestrator calendar intents", () => {
   });
 
   it("returns calendar schedule summaries when user asks", async () => {
-    const queryResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: "What's on my calendar this week?",
-    });
+    const queryResult = await runUserMessageTurn("u_alex", "What's on my calendar this week?");
 
     expect(queryResult.reply).toContain("Here is your calendar");
     expect(queryResult.reply).toContain("Launch planning sync");
@@ -148,10 +160,10 @@ describe("orchestrator calendar intents", () => {
   it("can read and write calendar events for another user", async () => {
     const calendarEvent = getCalendarEventDelegate(prisma);
 
-    const createResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: 'Schedule a meeting "Cross-team alignment" for Brooke tomorrow at 9am for 30 minutes',
-    });
+    const createResult = await runUserMessageTurn(
+      "u_alex",
+      'Schedule a meeting "Cross-team alignment" for Brooke tomorrow at 9am for 30 minutes',
+    );
 
     expect(createResult.reply).toContain('Created calendar event "Cross-team alignment"');
 
@@ -160,19 +172,16 @@ describe("orchestrator calendar intents", () => {
     });
     expect(created).toBeTruthy();
 
-    const queryResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: "Show Brooke's calendar for this week",
-    });
+    const queryResult = await runUserMessageTurn("u_alex", "Show Brooke's calendar for this week");
 
     expect(queryResult.reply).toContain("Here is your calendar");
     expect(queryResult.reply).toContain("Cross-team alignment");
 
     const originalStart = created?.startAt.toISOString();
-    const updateResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: 'Reschedule "Cross-team alignment" to tomorrow at 11am for Brooke',
-    });
+    const updateResult = await runUserMessageTurn(
+      "u_alex",
+      'Reschedule "Cross-team alignment" to tomorrow at 11am for Brooke',
+    );
 
     expect(updateResult.reply).toContain('Updated calendar event "Cross-team alignment"');
 
@@ -186,10 +195,10 @@ describe("orchestrator calendar intents", () => {
   it("creates one shared event with multiple attendees", async () => {
     const calendarEvent = getCalendarEventDelegate(prisma);
 
-    const createResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: 'Schedule a meeting "Shared planning" tomorrow at 2pm with Diego',
-    });
+    const createResult = await runUserMessageTurn(
+      "u_alex",
+      'Schedule a meeting "Shared planning" tomorrow at 2pm with Diego',
+    );
 
     expect(createResult.reply).toContain('Created calendar event "Shared planning"');
 
@@ -233,10 +242,7 @@ describe("orchestrator calendar intents", () => {
       },
     });
 
-    const queryResult = await runAgentCommandFn(prisma, {
-      userId: "u_alex",
-      input: "Check Brooke's calendar today",
-    });
+    const queryResult = await runUserMessageTurn("u_alex", "Check Brooke's calendar today");
 
     expect(queryResult.reply).toContain("Here is your calendar");
     expect(queryResult.reply).toContain("Morning sync check");

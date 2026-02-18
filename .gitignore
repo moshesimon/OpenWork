@@ -45,3 +45,5 @@ prisma/init.sql
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+agent_runtime/search_adapters/__pycache__/*
+company_files/*
